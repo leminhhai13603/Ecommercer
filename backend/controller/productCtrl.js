@@ -5,24 +5,18 @@ const validateMongoDbId = require('../utils/validateMongodbid');
 const slugify = require('slugify');
 const cloudinaryUploadImg = require('../utils/cloudinary');
 const fs = require('fs').promises;
-// Create Product
+
 const createProduct = asyncHandler(async (req, res) => {
     try {
-        // Tạo slug từ tiêu đề sản phẩm
         const slug = slugify(req.body.title, { lower: true, strict: true });
-        // Kiểm tra xem slug đã tồn tại chưa
         const existingProduct = await Product.findOne({ slug: slug });
         if (existingProduct) {
             return res.status(400).json({ message: "Slug đã tồn tại. Vui lòng chọn một tiêu đề khác." });
         }
-        // Thêm slug vào dữ liệu sản phẩm
         req.body.slug = slug;
-        // Tạo sản phẩm mới
         const newProduct = await Product.create(req.body);
         res.status(201).json(newProduct);
     } catch (error) {
-        // Xử lý lỗi chung
-        console.log(error);
         res.status(500).json({ 
             message: "Có lỗi xảy ra khi tạo sản phẩm.",
             error: process.env.NODE_ENV === 'development' ? error.message : undefined

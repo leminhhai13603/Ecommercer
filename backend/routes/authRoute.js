@@ -7,6 +7,7 @@ const {
     getUserByID,
     deleteUser,
     updateUser,
+    updateUserbyAdmin,
     blockUser,
     unblockUser,
     handleRefreshToken,
@@ -51,5 +52,5 @@ router.put('/unblock-user/:id', authMiddleware, isAdmin, unblockUser);
 router.put('/password', authMiddleware, updatePassword);
 router.put('/save-address', authMiddleware, saveUserAddress);
 router.put('/apply-coupon', authMiddleware, applyCoupon);
-
+router.put('/edit-user/:id', authMiddleware, isAdmin, updateUserbyAdmin);
 module.exports = router;

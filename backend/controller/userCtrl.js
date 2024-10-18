@@ -44,6 +44,7 @@ const loginUserCtrl = asyncHandler(async(req, res) => {
             firstname: findUser.firstname,
             lastname: findUser.lastname,
             email: findUser.email,
+            role: findUser.role,
             token: generateToken(findUser._id),
             refreshToken: refreshToken,
         });
@@ -117,6 +118,19 @@ const deleteUser = asyncHandler(async (req, res) => {
 
 const updateUser = asyncHandler(async (req, res) => {
     const { id } = req.user;
+    validateMongodbId(id);
+    try {
+        const user = await User.findByIdAndUpdate(id, req.body, { new: true });
+        if (!user) {
+            return res.status(404).json({ message: 'Người dùng không tồn tại' });
+        }
+        res.status(200).json(user);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+const updateUserbyAdmin = asyncHandler(async (req, res) => {
+    const { id } = req.params;
     validateMongodbId(id);
     try {
         const user = await User.findByIdAndUpdate(id, req.body, { new: true });
@@ -593,7 +607,8 @@ module.exports = {
     getAllUsers, 
     getUserByID, 
     deleteUser, 
-    updateUser, 
+    updateUser,
+    updateUserbyAdmin,
     blockUser, 
     unblockUser, 
     handleRefreshToken,

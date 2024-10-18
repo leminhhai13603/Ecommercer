@@ -29,15 +29,19 @@ const Home = () => {
     };
 
     return (
-        <div className="home">
-            <h1>Chào mừng đến với Trang Chủ</h1>
+        <div className="container">
+            <h1 className="my-4">Chào mừng đến với Trang Chủ</h1>
             <p>Đây là nơi bạn có thể tìm thấy thông tin mới nhất.</p>
-            <div className="product-list">
+            <div className="row">
                 {products.map(product => (
-                    <div key={product._id} className="product-item">
-                        <h2>{product.title}</h2>
-                        <p>Giá: {product.price} VNĐ</p>
-                        <button onClick={() => handleAddToCart(product._id)}>Thêm vào giỏ hàng</button>
+                    <div key={product._id} className="col-md-4 mb-4">
+                        <div className="card">
+                            <div className="card-body">
+                                <h5 className="card-title">{product.title}</h5>
+                                <p className="card-text">Giá: {product.price} VNĐ</p>
+                                <button className="btn btn-primary" onClick={() => handleAddToCart(product._id)}>Thêm vào giỏ hàng</button>
+                            </div>
+                        </div>
                     </div>
                 ))}
             </div>

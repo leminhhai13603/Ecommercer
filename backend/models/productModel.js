@@ -25,8 +25,8 @@ const productSchema = new mongoose.Schema({
         ref: 'Category',
     },
     brand: {
-        type: String,
-        enum: ['Apple', 'Samsung', 'Lenovo', 'Asus', 'HP', 'Dell', 'Microsoft', 'Razer', 'Logitech', 'Acer', 'Nvidia', 'AMD', 'Intel', 'Kingston', 'Seagate', 'Western Digital', 'Corsair', 'G.Skill', 'Samsung', 'Apple', 'Microsoft', 'Logitech', 'Razer', 'Acer', 'Nvidia', 'AMD', 'Intel', 'Kingston', 'Seagate', 'Western Digital', 'Corsair', 'G.Skill', 'MSI'],
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Brand',
     },
     quantity: {
         type: Number,
@@ -41,7 +41,7 @@ const productSchema = new mongoose.Schema({
     },
     color: {
         type: String,
-        required: true,
+        required: false,
     },
     ratings: [
         {
