@@ -3,20 +3,20 @@ const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs').promises;
 
-const multerStorage = multer.memoryStorage();
+const storage = multer.memoryStorage(); 
 
 const multerFilter = (req, file, cb) => {
     if (file.mimetype.startsWith('image')) {
         cb(null, true);
     } else {
-        cb(new Error('Không phải là file ảnh!'), false);
+        cb({ message: 'Unsupported file format' }, false);
     }
 };
 
 const uploader = multer({
-    storage: multerStorage,
+    storage: storage,
     fileFilter: multerFilter,
-    limits: { fileSize: 5000000 } // giới hạn 5MB
+    limits: { fileSize: 5000000 } 
 });
 
 const resizeImage = async (req, res, next, type) => {

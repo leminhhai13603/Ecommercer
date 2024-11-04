@@ -20,6 +20,7 @@ const {
     getUserCart,
     addToCart,
     removeFromCart,
+    updateCartItem,
     applyCoupon,
     createOrder,
     getOrders,
@@ -53,4 +54,5 @@ router.put('/password', authMiddleware, updatePassword);
 router.put('/save-address', authMiddleware, saveUserAddress);
 router.put('/apply-coupon', authMiddleware, applyCoupon);
 router.put('/edit-user/:id', authMiddleware, isAdmin, updateUserbyAdmin);
+router.put('/cart/update-quantity', authMiddleware, updateCartItem);
 module.exports = router;

@@ -3,17 +3,22 @@ import axios from 'axios';
 const API_URL = 'http://localhost:5000/api'; 
 
 export const registerUser = async (userData) => {
-    return await axios.post(`${API_URL}/user`, userData);
+    return await axios.post(`${API_URL}/user/register`, userData);
 };
 
 export const loginUser = async (loginData) => {
     return await axios.post(`${API_URL}/user/login`, loginData);
 };
-
-export const addToCart = async (cartData, token) => {
-    return await axios.post(`${API_URL}/cart`, cartData, {
+export const forgotPassword = async (email) => {
+    return await axios.post(`${API_URL}/user/forgot-password-token`, { email });
+};
+export const resetPassword = async (resetToken, newPassword) => {
+    return await axios.post(`${API_URL}/user/reset-password/${resetToken}`, { newPassword });
+};
+export const logout = async () => {
+    return await axios.post(`${API_URL}/user/logout`, {}, {
         headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${getAuthToken()}`,
         },
     });
 };
@@ -286,8 +291,47 @@ export const resetUserPassword = async (id, password) => {
     });
 };
 
+export const uploadProductImage = (id, formData) => {
+    return axios.put(`${API_URL}/product/upload/${id}`, formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data',
+            Authorization: `Bearer ${getAuthToken()}`,
+        },
+    });
+};
+export const addToCart = async (productId, quantity, color) => {
+    const token = getAuthToken();
+    return await axios.post(`${API_URL}/user/cart`, { productId, quantity, color }, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+};
 
+export const getCart = async () => {
+    const token = getAuthToken();
+    return await axios.get(`${API_URL}/user/cart`, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+};
 
+export const updateCartItem = async (productId, color, quantity) => {
+    const token = getAuthToken();
+    return await axios.put(`${API_URL}/user/cart/update-quantity`, { productId, color, quantity }, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+};
 
-        
-        
+export const removeFromCart = async (productId, color) => {
+    const token = getAuthToken();
+    return await axios.delete(`${API_URL}/user/remove-cart`, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+        data: { productId, color }
+    });
+};

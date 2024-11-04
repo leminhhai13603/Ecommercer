@@ -234,48 +234,53 @@ const rating = asyncHandler(async (req, res) => {
 
 const uploadImage = asyncHandler(async (req, res) => {
     const { id } = req.params;
+    console.log('Uploading image for product ID:', id);
     validateMongoDbId(id);
 
     try {
-        if (!req.file) {
+        console.log('Files received:', req.files);
+        if (!req.files || req.files.length === 0) {
             return res.status(400).json({ message: "Không có tệp nào được tải lên" });
         }
 
         const product = await Product.findById(id);
+        console.log('Product found:', product);
         if (!product) {
             return res.status(404).json({ message: "Không tìm thấy sản phẩm" });
         }
 
-        // Tải ảnh lên Cloudinary
-        const result = await cloudinaryUploadImg(req.file.path);
-
-        // Thêm ảnh mới vào mảng images
-        product.images.push({
-            url: result.url,
-            public_id: result.public_id
+        const uploadPromises = req.files.map(async (file) => {
+            console.log('Processing file:', file.originalname);
+            try {
+                // Sử dụng buffer thay vì file path
+                const result = await cloudinaryUploadImg(file.buffer);
+                console.log('Cloudinary result:', result);
+                return {
+                    url: result.url,
+                    public_id: result.public_id
+                };
+            } catch (uploadError) {
+                console.error('Error uploading to Cloudinary:', uploadError);
+                throw uploadError;
+            }
         });
 
-        await product.save();
+        const uploadedImages = await Promise.all(uploadPromises);
+        console.log('Uploaded images:', uploadedImages);
 
-        // Xóa file tạm trên server
-        await fs.unlink(req.file.path);
+        product.images.push(...uploadedImages);
+        await product.save();
 
         res.status(200).json({ 
             message: "Ảnh đã được tải lên và cập nhật thành công", 
             product: product 
         });
     } catch (error) {
-        console.error('Lỗi khi tải lên ảnh:', error);
-        if (req.file && req.file.path) {
-            try {
-                await fs.unlink(req.file.path);
-            } catch (unlinkError) {
-                console.error('Lỗi khi xóa file tạm:', unlinkError);
-            }
-        }
+        console.error('Lỗi chi tiết khi tải lên ảnh:', error);
         res.status(500).json({ 
             message: "Lỗi khi tải lên và cập nhật ảnh", 
-            error: error.message
+            error: error.message,
+            stack: error.stack
         });
     }
 });

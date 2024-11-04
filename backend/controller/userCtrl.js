@@ -201,7 +201,7 @@ const forgotPasswordToken = asyncHandler(async (req, res) => {
         const resetToken = await user.createPasswordResetToken();
         await user.save();
         
-        const resetURL = `http://localhost:3000/api/user/reset-password/${resetToken}`;
+        const resetURL = `http://localhost:5000/api/user/reset-password/${resetToken}`;
         
         const data = {
             to: user.email,
@@ -303,8 +303,9 @@ const getUserCart = asyncHandler(async (req, res) => {
 
         const detailedCart = {
             items: cart.products.map(item => {
-                const productDetails = item.product;
-                const discountedPrice = item.price * (1 - (productDetails.discountPercentage || 0) / 100);
+                const productDetails = item.product || {};
+                const discountPercentage = productDetails.discountPercentage || 0;
+                const discountedPrice = item.price * (1 - discountPercentage / 100);
                 const subtotalBeforeDiscount = item.quantity * item.price;
                 const subtotalAfterDiscount = item.quantity * discountedPrice;
 
@@ -314,8 +315,8 @@ const getUserCart = asyncHandler(async (req, res) => {
                 return {
                     product: {
                         _id: productDetails._id,
-                        title: productDetails.title,
-                        price: productDetails.price,
+                        title: productDetails.title || 'Sản phẩm không tồn tại',
+                        price: productDetails.price || 0,
                         discountedPrice: discountedPrice,
                         image: productDetails.images && productDetails.images.length > 0 ? productDetails.images[0] : null
                     },
@@ -413,6 +414,35 @@ const removeFromCart = asyncHandler(async (req, res) => {
             message: 'Có lỗi xảy ra khi xóa sản phẩm khỏi giỏ hàng',
             error: error.message
         });
+    }
+});
+const updateCartItem = asyncHandler(async (req, res) => {
+    const { _id } = req.user;
+    const { productId, quantity } = req.body;
+    validateMongodbId(_id);
+    try {
+        const cart = await Cart.findOne({ userId: _id });
+        if (!cart) {
+            return res.status(404).json({ message: 'Không tìm thấy giỏ hàng' });
+        }
+
+        cart.products = cart.products.map(item => 
+            item.product.toString() === productId ? { ...item, quantity: quantity } : item
+        );
+
+        cart.cartTotal = cart.products.reduce((total, item) => total + (item.price * item.quantity), 0);
+        await cart.save();
+
+        // Cập nhật giỏ hàng trong User model
+        await User.findByIdAndUpdate(_id, { cart: cart.products });
+
+        res.status(200).json({
+            message: 'Số lượng sản phẩm đã được cập nhật thành công',
+            cart: cart
+        });
+    } catch (error) {
+        console.error('Lỗi khi cập nhật sản phẩm trong giỏ hàng:', error);
+        res.status(500).json({ message: 'Có lỗi xảy ra khi cập nhật sản phẩm trong giỏ hàng', error: error.message });
     }
 });
 
@@ -621,6 +651,7 @@ module.exports = {
     getUserCart,
     addToCart,
     removeFromCart,
+    updateCartItem,
     applyCoupon,
     createOrder,
     getOrders,
