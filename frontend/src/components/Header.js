@@ -26,7 +26,7 @@ const Header = () => {
                 <div className="user-info d-flex align-items-center">
                     {isAuthenticated ? (
                         <>
-                            <span className="me-3">Xin chào, User</span>
+                            <span className="me-3">Xin chào</span>
                             <button onClick={handleLogout} className="btn btn-outline-danger me-3">Đăng xuất</button>
                         </>
                     ) : (

@@ -7,26 +7,37 @@ import { toast } from 'react-toastify';
 const Login = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const { setIsAuthenticated } = useContext(AuthContext);
+    const { setIsAuthenticated, setUser } = useContext(AuthContext); // Kiểm tra xem AuthContext đã truyền đúng chưa
     const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
             const response = await loginUser({ email, password });
-            localStorage.setItem('token', response.data.token);
-            setIsAuthenticated(true);
-            
-            if (response.data.role === 'admin') {
-                navigate('/admin');
+
+            if (response && response.data) {
+                const { token, refreshToken, ...user } = response.data;
+
+                localStorage.setItem('token', token);
+                localStorage.setItem('refreshToken', refreshToken);
+                localStorage.setItem('user', JSON.stringify(user));
+
+                setIsAuthenticated(true); // Cập nhật trạng thái đăng nhập
+                setUser(user); // Cập nhật thông tin người dùng
+
+                toast.success('Đăng nhập thành công');
+
+                if (user.role === 'admin') {
+                    navigate('/admin');
+                } else {
+                    navigate('/');
+                }
             } else {
-                navigate('/');
+                throw new Error('Phản hồi API không hợp lệ');
             }
-            
-            toast.success('Đăng nhập thành công');
         } catch (error) {
             console.error('Lỗi đăng nhập:', error);
-            
+
             if (error.response) {
                 switch (error.response.status) {
                     case 401:
