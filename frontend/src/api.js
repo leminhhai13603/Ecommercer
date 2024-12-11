@@ -26,6 +26,9 @@ export const logout = async () => {
 export const getAllProducts = async () => {
     return await axios.get(`${API_URL}/product`);
 };
+export const getProductById = async (id) => {
+    return await axios.get(`${API_URL}/product/${id}`);
+};
 
 const getAuthToken = () => {
     return localStorage.getItem('token');
@@ -54,6 +57,15 @@ export const deleteProduct = async (id) => {
         },
     });
 };
+export const submitProductRating = async (data) => {
+    const token = localStorage.getItem('token');
+    return await axios.post(`${API_URL}/product/rating`, data, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+};
+
 
 // API cho Brands
 export const getAllBrands = async () => {

@@ -76,7 +76,7 @@ const CartPage = () => {
                             <div key={`${item.product._id}-${item.color}`} className="card mb-3">
                                 <div className="row g-0">
                                     <div className="col-md-2">
-                                        <img src={item.product.image[0]?.url || 'https://via.placeholder.com/150'} 
+                                        <img src={item.product.image?.url || 'https://via.placeholder.com/150'} 
                                              alt={item.product.title} 
                                              className="img-fluid rounded-start" 
                                              style={{maxHeight: '100px', objectFit: 'cover'}} />

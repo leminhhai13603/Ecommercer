@@ -4,6 +4,7 @@ import { AuthProvider, AuthContext } from './contexts/AuthContext';
 import Layout from './components/Layout';  
 import AdminLayout from './components/AdminLayout'; 
 import Home from './pages/Home';
+import ProductDetail from './pages/ProductDetail';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import About from './pages/About';
@@ -47,7 +48,7 @@ const App = () => {
                             <Route path="/contact" element={<Contact />} />
                             <Route path="/privacy" element={<Privacy />} />
                             <Route path="/forgot-password" element={<ForgotPassword />} />
-
+                            <Route path="/product/:id" element={<ProductDetail />} />
                             {/* Private Routes */}
                             <Route 
                                 path="/" 

@@ -39,3 +39,20 @@
     text-align: right;
     font-weight: bold;
 }
+.cart-item-image-container {
+    width: 120px; /* Cố định chiều rộng khung */
+    height: 120px; /* Cố định chiều cao khung */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden; /* Đảm bảo không cho hình ảnh vượt ra ngoài khung */
+    border-radius: 5px;
+    border: 1px solid #ddd; /* Tùy chọn */
+}
+
+.cart-item-image {
+    width: auto; /* Chiều rộng tự động theo tỷ lệ */
+    height: 100%; /* Chiều cao đầy khung */
+    object-fit: cover; /* Phủ đầy khung nhưng giữ tỷ lệ */
+}
+

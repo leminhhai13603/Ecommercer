@@ -51,7 +51,7 @@ const AdminLayout = () => {
             transition: 'all 0.3s',
           }}
         >
-          {isMenuOpen ? '❮ Collapse' : '❯ Expand'}
+          {isMenuOpen ? '❮ Đóng' : '❯ Mở'}
         </button>
 
         <nav style={{ flex: 1, width: '100%' }}>

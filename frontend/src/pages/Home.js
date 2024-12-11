@@ -1,13 +1,13 @@
 import React, { useEffect, useState, useCallback, useContext } from 'react';
-import { getAllProducts, addToCart } from '../api';
+import { getAllProducts } from '../api';
 import { toast } from 'react-toastify';
 import { AuthContext } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import 'react-toastify/dist/ReactToastify.css';
 import ReactPaginate from 'react-paginate';
 
 const Home = () => {
-    const { isAuthenticated, user } = useContext(AuthContext); 
+    const { isAuthenticated, user } = useContext(AuthContext);
     const navigate = useNavigate();
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -37,15 +37,6 @@ const Home = () => {
     useEffect(() => {
         fetchProducts();
     }, [fetchProducts]);
-
-    const handleAddToCart = async (productId) => {
-        try {
-            const response = await addToCart(productId, 1, 'default');
-            toast.success(response.data.message);
-        } catch (error) {
-            toast.error('Không thể thêm vào giỏ hàng. Vui lòng thử lại.');
-        }
-    };
 
     const handleSearch = (e) => {
         setSearchTerm(e.target.value);
@@ -87,7 +78,6 @@ const Home = () => {
 
     return (
         <div className="container mt-5">
-            {/* Hiển thị tên người dùng nếu tồn tại */}
             <h1 className="text-center mb-5">
                 {user?.lastname 
                     ? `Chào mừng, ${user.lastname}`
@@ -116,15 +106,22 @@ const Home = () => {
                 {currentProducts.map(product => (
                     <div key={product._id} className="col">
                         <div className="card h-100 shadow-sm">
-                            <img src={product.images?.[0]?.url || 'https://via.placeholder.com/300'} className="card-img-top" alt={product.title || 'No title'} style={{ height: '200px', objectFit: 'cover' }} />
+                            <Link to={`/product/${product._id}`}>
+                                <img
+                                    src={product.images?.[0]?.url || 'https://via.placeholder.com/300'}
+                                    className="card-img-top"
+                                    alt={product.title || 'No title'}
+                                    style={{ height: '200px', objectFit: 'cover' }}
+                                />
+                            </Link>
                             <div className="card-body d-flex flex-column">
                                 <h5 className="card-title">{product.title || 'No title'}</h5>
                                 <p className="card-text flex-grow-1">{product.description?.substring(0, 50) || 'No description'}...</p>
                                 <div className="d-flex justify-content-between align-items-center mt-auto">
                                     <span className="h5 mb-0">{product.price?.toLocaleString() || 0} VNĐ</span>
-                                    <button className="btn btn-primary btn-sm" onClick={() => handleAddToCart(product._id)}>
-                                        <i className="bi bi-cart-plus"></i> Thêm
-                                    </button>
+                                    <Link to={`/product/${product._id}`} className="btn btn-primary btn-sm">
+                                        Chi tiết
+                                    </Link>
                                 </div>
                             </div>
                         </div>
