@@ -22,6 +22,14 @@ export const logout = async () => {
         },
     });
 };
+export const changePassword = async (token, data) => {
+    return await axios.put(`${API_URL}/user/password`, data, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+};
+
 // API cho Products
 export const getAllProducts = async () => {
     return await axios.get(`${API_URL}/product`);
@@ -213,12 +221,22 @@ export const deleteCoupon = async (id) => {
 };
 
 // API cho Orders
-export const getAllOrders = async () => {
-    return await axios.get(`${API_URL}/order`);
+export const getAllOrders = async (token) => {
+    return await axios.get(`${API_URL}/user/get-orders`, {
+        headers: {
+            Authorization: `Bearer ${getAuthToken()}`,
+        },
+    });
 };
-
-export const createOrder = async (orderData) => {
-    return await axios.post(`${API_URL}/order`, orderData, {
+export const getUserOrders = async (token) => {
+    return await axios.get(`${API_URL}/user/get-order`, {
+        headers: {
+            Authorization: `Bearer ${getAuthToken()}`,
+        },
+    });
+};
+export const createCheckoutOrder = async (orderData) => {
+    return await axios.post(`${API_URL}/user/create-order`, orderData, {
         headers: {
             Authorization: `Bearer ${getAuthToken()}`,
         },
@@ -250,6 +268,13 @@ export const updateOrderStatus = async (id, status) => {
 // API cho Users
 export const getAllUsers = async () => {
     return await axios.get(`${API_URL}/user/all-users`, {
+        headers: {
+            Authorization: `Bearer ${getAuthToken()}`,
+        },
+    });
+};
+export const getUserById = async (id) => {
+    return await axios.get(`${API_URL}/user/${id}`, {
         headers: {
             Authorization: `Bearer ${getAuthToken()}`,
         },

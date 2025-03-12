@@ -34,6 +34,7 @@ const AdminLayout = () => {
           flexDirection: 'column',
           alignItems: isMenuOpen ? 'flex-start' : 'center',
           position: 'relative',
+          overflowY: 'auto', // Cho phép cuộn nếu sidebar dài
         }}
       >
         <button
@@ -94,10 +95,11 @@ const AdminLayout = () => {
       <div
         style={{
           flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          overflowY: 'auto', // Cho phép cuộn nội dung chính
           padding: '20px',
           backgroundColor: '#f4f4f4',
-          transition: 'margin-left 0.3s',
-          marginLeft: isMenuOpen ? '0' : '0',
         }}
       >
         <Outlet />

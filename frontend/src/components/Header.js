@@ -1,46 +1,90 @@
-import React, { useContext } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../contexts/AuthContext';
+import { FaShoppingCart, FaUserCircle, FaSignOutAlt, FaKey, } from 'react-icons/fa';
 
 const Header = () => {
-    const { isAuthenticated, setIsAuthenticated } = useContext(AuthContext);
+    const { isAuthenticated, setIsAuthenticated, user } = useContext(AuthContext);
     const navigate = useNavigate();
+    const [cartCount, setCartCount] = useState(0);
+    const [dropdownOpen, setDropdownOpen] = useState(false);
+
+    useEffect(() => {
+        const cartItems = JSON.parse(localStorage.getItem('cart')) || [];
+        setCartCount(cartItems.length);
+    }, []);
 
     const handleLogout = () => {
-        // Thực hiện đăng xuất
         localStorage.removeItem('token');
         setIsAuthenticated(false);
         navigate('/login');
     };
 
     return (
-        <header className="bg-light">
-            <div className="container d-flex justify-content-between align-items-center py-3">
-                <div className="logo">
-                    <Link to="/" className="text-decoration-none">Logo</Link>
-                    <span className="ms-2">E-Commerce</span>
+        <header className="bg-light shadow-sm border-bottom">
+            <div className="container d-flex justify-content-between align-items-center py-2">
+                {/* Logo */}
+                <div className="d-flex align-items-center">
+                    <Link to="/" className="text-decoration-none fw-bold fs-4 text-primary me-4">E-Commerce</Link>
                 </div>
-                <div className="search-bar">
-                    <input type="text" className="form-control" placeholder="Tìm kiếm sản phẩm..." />
-                </div>
-                <div className="user-info d-flex align-items-center">
+
+                {/* Dropdown Người dùng */}
+                <div className="d-flex align-items-center">
                     {isAuthenticated ? (
-                        <>
-                            <span className="me-3">Xin chào</span>
-                            <button onClick={handleLogout} className="btn btn-outline-danger me-3">Đăng xuất</button>
-                        </>
+                        <div 
+                            className="position-relative me-3" 
+                            onMouseEnter={() => setDropdownOpen(true)} 
+                            onMouseLeave={() => setDropdownOpen(false)}
+                        >
+                            <button
+                                className="btn btn-outline-secondary d-flex align-items-center"
+                            >
+                                <FaUserCircle className="me-2" />
+                                {user?.fullName || 'User'}
+                            </button>
+
+                            {dropdownOpen && (
+                                <ul className="dropdown-menu show position-absolute" style={{ top: '100%', right: 0 }}>
+                                    <li>
+                                        <Link to="/profile" className="dropdown-item">
+                                            <FaUserCircle className="me-2" /> Trang cá nhân
+                                        </Link>
+                                    </li>
+                                    <li>
+                                        <Link to="/order-history" className="dropdown-item">
+                                            <FaShoppingCart className="me-2" /> Lịch sử đơn hàng
+                                        </Link>
+                                    </li>
+                                    <li>
+                                        <Link to="/change-password" className="dropdown-item">
+                                            <FaKey className="me-2" /> Đổi mật khẩu
+                                        </Link>
+                                    </li>
+                                    <li>
+                                        <button onClick={handleLogout} className="dropdown-item">
+                                            <FaSignOutAlt className="me-2" /> Đăng xuất
+                                        </button>
+                                    </li>
+                                </ul>
+                            )}
+                        </div>
                     ) : (
                         <>
                             <Link to="/login" className="btn btn-outline-primary me-2">Đăng nhập</Link>
-                            <Link to="/register" className="btn btn-outline-secondary me-3">Đăng ký</Link>
+                            <Link to="/register" className="btn btn-outline-secondary">Đăng ký</Link>
                         </>
                     )}
-                    <div className="cart">
-                        <Link to="/cart" className="btn btn-outline-success">
-                            <i className="fas fa-shopping-cart"></i>
-                        </Link>
-                        <span className="cart-count">0</span>
-                    </div>
+
+                    {/* Giỏ hàng */}
+                    <Link to="/cart" className="btn btn-outline-success d-flex align-items-center position-relative">
+                        <FaShoppingCart size={22} />
+                        <span className="ms-1">Giỏ hàng</span>
+                        {cartCount > 0 && (
+                            <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                                {cartCount}
+                            </span>
+                        )}
+                    </Link>
                 </div>
             </div>
         </header>

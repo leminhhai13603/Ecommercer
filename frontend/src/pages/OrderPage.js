@@ -1,81 +1,152 @@
-import React, { useEffect, useState } from 'react';
-import { getAllOrders, updateOrderStatus } from '../api';
+/* eslint-disable react-hooks/exhaustive-deps */
+import React, { useEffect, useState, useCallback } from 'react';
+import { getAllOrders, updateOrderStatus, getUserById } from '../api';
+import ReactPaginate from 'react-paginate';
 
 const OrderPage = () => {
     const [orders, setOrders] = useState([]);
-    const [statusFilter, setStatusFilter] = useState('');
+    const [userNames, setUserNames] = useState({});
+    const [loading, setLoading] = useState(false);
+    const [currentPage, setCurrentPage] = useState(0);
+    const ordersPerPage = 4;
 
-    useEffect(() => {
-        fetchOrders();
+    const fetchUserNames = useCallback(async (orders) => {
+        const userIds = [...new Set(orders.map(order => order.user?._id))];
+        const newNames = {};
+
+        await Promise.all(userIds.map(async (id) => {
+            if (id && !userNames[id]) {
+                try {
+                    const response = await getUserById(id);
+                    const user = response.data;
+                    newNames[id] = `${user.firstname} ${user.lastname}`;
+                } catch (error) {
+                    console.error(`Lỗi khi lấy thông tin người dùng với ID ${id}:`, error);
+                    newNames[id] = "Không có tên";
+                }
+            }
+        }));
+
+        setUserNames(prevNames => ({ ...prevNames, ...newNames }));
     }, []);
 
-    const fetchOrders = async () => {
-        const response = await getAllOrders();
-        setOrders(response.data.data);
-    };
+    const fetchOrders = useCallback(async () => {
+        setLoading(true);
+        try {
+            const response = await getAllOrders();
+            const orderData = response.data.data;
+            setOrders(orderData);
+            await fetchUserNames(orderData);
+        } catch (error) {
+            console.error("Lỗi khi lấy đơn hàng:", error);
+        } finally {
+            setLoading(false);
+        }
+    }, [fetchUserNames]);
+    
+    useEffect(() => {
+        fetchOrders();
+    }, [fetchOrders]);
 
     const handleStatusChange = async (orderId, newStatus) => {
         try {
             await updateOrderStatus(orderId, { status: newStatus });
-            fetchOrders();
+            setOrders(prevOrders =>
+                prevOrders.map(order =>
+                    order._id === orderId ? { ...order, orderStatus: newStatus } : order
+                )
+            );
         } catch (error) {
             console.error('Lỗi khi cập nhật trạng thái đơn hàng:', error);
         }
     };
 
-    const filteredOrders = statusFilter
-        ? orders.filter(order => order.status === statusFilter)
-        : orders;
+    const handlePageClick = (event) => {
+        setCurrentPage(event.selected);
+    };
+
+    const offset = currentPage * ordersPerPage;
+    const currentOrders = orders.slice(offset, offset + ordersPerPage);
+    const pageCount = Math.ceil(orders.length / ordersPerPage);
+
+    if (loading) {
+        return <div>Đang tải dữ liệu...</div>;
+    }
 
     return (
-        <div className="container">
-            <h1 className="my-4">Quản lý Đơn hàng</h1>
-            <div className="mb-3">
-                <label htmlFor="statusFilter" className="form-label">Lọc theo trạng thái:</label>
-                <select
-                    id="statusFilter"
-                    className="form-select"
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                >
-                    <option value="">Tất cả</option>
-                    <option value="Đang xử lý">Đang xử lý</option>
-                    <option value="Đang giao hàng">Đang giao hàng</option>
-                    <option value="Đã giao hàng">Đã giao hàng</option>
-                    <option value="Đã hủy">Đã hủy</option>
-                </select>
-            </div>
-            <ul className="list-group mb-4">
-                {filteredOrders.map(order => (
-                    <li key={order._id} className="list-group-item">
-                        <h3>Đơn hàng #{order._id}</h3>
-                        <p>Khách hàng: {order.user.name}</p>
-                        <p>Tổng tiền: {order.totalPrice} VNĐ</p>
-                        <p>Trạng thái: 
-                            <select
-                                value={order.status}
-                                onChange={(e) => handleStatusChange(order._id, e.target.value)}
-                                className="form-select d-inline-block w-auto ms-2"
-                            >
-                                <option value="Đang xử lý">Đang xử lý</option>
-                                <option value="Đang giao hàng">Đang giao hàng</option>
-                                <option value="Đã giao hàng">Đã giao hàng</option>
-                                <option value="Đã hủy">Đã hủy</option>
-                            </select>
-                        </p>
-                        <h4>Sản phẩm:</h4>
-                        <ul>
-                            {order.products.map(item => (
-                                <li key={item.product._id}>
-                                    {item.product.title} - Số lượng: {item.quantity} - Giá: {item.price} VNĐ
-                                </li>
-                            ))}
-                        </ul>
-                    </li>
-                ))}
-            </ul>
+        <div className="container mt-4">
+            <h1 className="mb-4">Quản lý Đơn hàng</h1>
+
+            <table className="table table-bordered">
+                <thead>
+                    <tr>
+                        <th>Mã đơn hàng</th>
+                        <th>Khách hàng</th>
+                        <th>Email</th>
+                        <th>Địa chỉ</th>
+                        <th>Tổng tiền</th>
+                        <th>Trạng thái</th>
+                        <th>Hành động</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {currentOrders.length > 0 ? (
+                        currentOrders.map(order => {
+                            const totalAmount = order.products.reduce((total, item) => {
+                                return item.product ? total + item.product.price * item.quantity : total;
+                            }, 0);
+
+                            return (
+                                <tr key={order._id}>
+                                    <td>{order._id}</td>
+                                    <td>{userNames[order.user?._id] || "Không có tên"}</td>
+                                    <td>{order.user?.email || 'Không có email'}</td>
+                                    <td>{order.shippingInfo?.address}</td>
+                                    <td>{totalAmount.toLocaleString()} VNĐ</td>
+                                    <td><span className={`badge ${getStatusClass(order.orderStatus)}`}>{order.orderStatus}</span></td>
+                                    <td>
+                                        <button className="btn btn-info btn-sm me-2" onClick={() => handleStatusChange(order._id, 'Đang xử lý')} disabled={order.orderStatus === 'Đang xử lý'}>Xử lý</button>
+                                        <button className="btn btn-warning btn-sm me-2" onClick={() => handleStatusChange(order._id, 'Đang giao hàng')} disabled={order.orderStatus === 'Đang giao hàng'}>Giao hàng</button>
+                                        <button className="btn btn-success btn-sm me-2" onClick={() => handleStatusChange(order._id, 'Đã giao hàng')} disabled={order.orderStatus === 'Đã giao hàng'}>Hoàn thành</button>
+                                        <button className="btn btn-danger btn-sm" onClick={() => handleStatusChange(order._id, 'Đã hủy')} disabled={order.orderStatus === 'Đã hủy'}>Hủy</button>
+                                    </td>
+                                </tr>
+                            );
+                        })
+                    ) : (
+                        <tr>
+                            <td colSpan="7" className="text-center">Không có đơn hàng nào.</td>
+                        </tr>
+                    )}
+                </tbody>
+            </table>
+
+            <ReactPaginate
+                previousLabel={'← Trước'}
+                nextLabel={'Sau →'}
+                pageCount={pageCount}
+                onPageChange={handlePageClick}
+                containerClassName={'pagination justify-content-center mt-4'}
+                pageClassName={'page-item'}
+                pageLinkClassName={'page-link custom-page-link'}
+                activeClassName={'active custom-active'}
+                previousClassName={'page-item'}
+                nextClassName={'page-item'}
+                previousLinkClassName={'page-link custom-nav-link'}
+                nextLinkClassName={'page-link custom-nav-link'}
+            />
         </div>
     );
+};
+
+const getStatusClass = (status) => {
+    switch (status) {
+        case 'Đang xử lý': return 'bg-info';
+        case 'Đang giao hàng': return 'bg-warning';
+        case 'Đã giao hàng': return 'bg-success';
+        case 'Đã hủy': return 'bg-danger';
+        default: return 'bg-secondary';
+    }
 };
 
 export default OrderPage;

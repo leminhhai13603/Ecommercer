@@ -1,8 +1,8 @@
 import React, { useContext } from 'react';
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import { AuthProvider, AuthContext } from './contexts/AuthContext';
-import Layout from './components/Layout';  
-import AdminLayout from './components/AdminLayout'; 
+import Layout from './components/Layout';
+import AdminLayout from './components/AdminLayout';
 import Home from './pages/Home';
 import ProductDetail from './pages/ProductDetail';
 import Login from './pages/Login';
@@ -20,15 +20,25 @@ import UserPage from './pages/UserPage';
 import OrderPage from './pages/OrderPage';
 import ForgotPassword from './pages/ForgotPassword';
 import CartPage from './pages/CartPage';
+import CheckoutPage from './pages/CheckoutPage';
+import ProfilePage from './pages/ProfilePage';
+import OrderHistoryPage from './pages/OrderHistoryPage';
+import ChangePasswordPage from './pages/ChangePasswordPage';
+
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import ErrorBoundary from './components/ErrorBoundary';
+
+import './App.css';
+import 'bootstrap/dist/css/bootstrap.min.css';
+import 'bootstrap/dist/js/bootstrap.bundle.min.js';
+
 
 const PrivateRoute = ({ children }) => {
     const { isAuthenticated, loading } = useContext(AuthContext);
 
     if (loading) {
-        return <div>Loading...</div>;
+        return <div>Đang kiểm tra đăng nhập...</div>;
     }
 
     return isAuthenticated ? children : <Navigate to="/login" />;
@@ -49,33 +59,17 @@ const App = () => {
                             <Route path="/privacy" element={<Privacy />} />
                             <Route path="/forgot-password" element={<ForgotPassword />} />
                             <Route path="/product/:id" element={<ProductDetail />} />
+                            
                             {/* Private Routes */}
-                            <Route 
-                                path="/" 
-                                element={
-                                    <PrivateRoute>
-                                        <Home />
-                                    </PrivateRoute>
-                                } 
-                            />
-                            <Route 
-                                path="/cart" 
-                                element={
-                                    <PrivateRoute>
-                                        <CartPage />
-                                    </PrivateRoute>
-                                } 
-                            />
-
+                            <Route path="/" element={<PrivateRoute><Home /></PrivateRoute>} />
+                            <Route path="/cart" element={<PrivateRoute><CartPage /></PrivateRoute>} />
+                            <Route path="/checkout" element={<PrivateRoute><CheckoutPage /></PrivateRoute>} />
+                            <Route path="/profile" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />  
+                            <Route path="/order-history" element={<PrivateRoute><OrderHistoryPage /></PrivateRoute>} />
+                            <Route path="/change-password" element={<PrivateRoute><ChangePasswordPage /></PrivateRoute>} />
+  
                             {/* Admin Routes */}
-                            <Route 
-                                path="/admin" 
-                                element={
-                                    <PrivateRoute>
-                                        <AdminLayout />
-                                    </PrivateRoute>
-                                }
-                            >
+                            <Route path="/admin" element={<PrivateRoute><AdminLayout /></PrivateRoute>}>
                                 <Route path="products" element={<ProductPage />} />
                                 <Route path="brands" element={<BrandPage />} />
                                 <Route path="product-categories" element={<ProductCategoryPage />} />
@@ -87,8 +81,9 @@ const App = () => {
                             </Route>
                         </Routes>
                     </Layout>
-                    <ToastContainer />
                 </Router>
+                {/* ✅ Di chuyển ToastContainer ra ngoài Router */}
+                <ToastContainer position="top-right" autoClose={3000} hideProgressBar />
             </AuthProvider>
         </ErrorBoundary>
     );

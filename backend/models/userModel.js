@@ -8,12 +8,10 @@ var userSchema = new mongoose.Schema({
     firstname:{
         type:String,
         required:true,
-        // Loại bỏ unique nếu có
     },
     lastname:{
         type:String,
         required:true,
-        // Loại bỏ unique nếu có
     },
     email:{
         type:String,
@@ -23,7 +21,6 @@ var userSchema = new mongoose.Schema({
     mobile:{
         type:String,
         required:true,
-        // Loại bỏ unique
     },
     password:{
         type:String,

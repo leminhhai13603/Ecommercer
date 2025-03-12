@@ -7,7 +7,7 @@ import { toast } from 'react-toastify';
 const Login = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const { setIsAuthenticated, setUser } = useContext(AuthContext); // Kiểm tra xem AuthContext đã truyền đúng chưa
+    const { setIsAuthenticated, setUser } = useContext(AuthContext); 
     const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
@@ -18,15 +18,17 @@ const Login = () => {
             if (response && response.data) {
                 const { token, refreshToken, ...user } = response.data;
 
+                // ✅ Lưu token và thông tin người dùng vào localStorage
                 localStorage.setItem('token', token);
                 localStorage.setItem('refreshToken', refreshToken);
                 localStorage.setItem('user', JSON.stringify(user));
 
-                setIsAuthenticated(true); // Cập nhật trạng thái đăng nhập
-                setUser(user); // Cập nhật thông tin người dùng
+                setIsAuthenticated(true); 
+                setUser(user);
 
                 toast.success('Đăng nhập thành công');
 
+                // ✅ Điều hướng sau khi đăng nhập
                 if (user.role === 'admin') {
                     navigate('/admin');
                 } else {

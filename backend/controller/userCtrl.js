@@ -573,6 +573,18 @@ const createOrder = asyncHandler(async (req, res) => {
         });
     }
 });
+const getAllOrders = async (req, res) => {
+    try {
+        const orders = await Order.find()
+            .populate('user', 'fullName email') 
+            .populate('products.product', 'title price images'); 
+
+        res.status(200).json({ success: true, data: orders });
+    } catch (error) {
+        console.error('Lỗi khi lấy danh sách đơn hàng:', error);
+        res.status(500).json({ message: 'Lỗi máy chủ, không thể lấy danh sách đơn hàng' });
+    }
+};
 
 const getOrders = asyncHandler(async (req, res) => {
     const { _id } = req.user;
@@ -654,6 +666,7 @@ module.exports = {
     updateCartItem,
     applyCoupon,
     createOrder,
+    getAllOrders,
     getOrders,
     updateOrderStatus
 };

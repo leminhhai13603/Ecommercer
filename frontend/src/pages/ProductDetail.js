@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { getProductById, getAllCategories, getAllBrands, getAllUsers, submitProductRating, addToCart } from '../api';
+import { getProductById, getAllCategories, getAllBrands, getAllUsers, submitProductRating, addToCart as apiAddToCart } from '../api';
 import { toast } from 'react-toastify';
+import { FaStar } from 'react-icons/fa';
 
 const ProductDetail = () => {
     const { id } = useParams();
@@ -12,16 +13,15 @@ const ProductDetail = () => {
     const [users, setUsers] = useState([]);
 
     const [rating, setRating] = useState(0);
+    const [hover, setHover] = useState(null);
     const [review, setReview] = useState('');
 
     useEffect(() => {
         const fetchData = async () => {
             try {
-                // Fetch product details
                 const productResponse = await getProductById(id);
                 setProduct(productResponse.data);
 
-                // Fetch all categories, brands, and users
                 const categoriesResponse = await getAllCategories();
                 const brandsResponse = await getAllBrands();
                 const usersResponse = await getAllUsers();
@@ -61,14 +61,12 @@ const ProductDetail = () => {
         }
 
         try {
-            // Gửi đánh giá lên API
             const response = await submitProductRating({
                 prodId: id,
                 star: rating,
                 comment: review,
             });
 
-            // Cập nhật danh sách đánh giá mới từ phản hồi API
             setProduct(response.data.product);
             setRating(0);
             setReview('');
@@ -81,7 +79,7 @@ const ProductDetail = () => {
 
     const handleAddToCart = async () => {
         try {
-            await addToCart(product._id, 1, product.color);
+            await apiAddToCart(product._id, 1, product.color);
             toast.success('Sản phẩm đã được thêm vào giỏ hàng!');
         } catch (error) {
             console.error('Error adding to cart:', error);
@@ -116,9 +114,13 @@ const ProductDetail = () => {
                     <p><strong>Thương hiệu:</strong> {getBrandName(product.brand)}</p>
                     <p><strong>Số lượng:</strong> {product.quantity}</p>
                     <p><strong>Màu sắc:</strong> {product.color}</p>
-                    <p><strong>Tổng đánh giá:</strong> {product.totalrating}</p>
-                    <button className="btn btn-success mt-3" onClick={handleAddToCart}>
-                        Thêm vào giỏ hàng
+                    <p><strong>Tổng đánh giá:</strong> {
+                        Array.from({ length: 5 }, (_, i) => (
+                            <FaStar key={i} color={i < product.totalrating ? '#ffc107' : '#e4e5e9'} />
+                        ))
+                    }</p>
+                    <button className="btn btn-success mt-3" onClick={handleAddToCart} disabled={product.quantity <= 0}>
+                        {product.quantity > 0 ? 'Thêm vào giỏ hàng' : 'Hết hàng'}
                     </button>
                 </div>
             </div>
@@ -129,7 +131,11 @@ const ProductDetail = () => {
                     product.ratings.map((review, index) => (
                         <div key={index} className="review-item border p-3 mb-3">
                             <h5>{getUserName(review.postedBy)}</h5>
-                            <p>Đánh giá: {review.star} / 5</p>
+                            <p>
+                                {Array.from({ length: 5 }, (_, i) => (
+                                    <FaStar key={i} color={i < review.star ? '#ffc107' : '#e4e5e9'} />
+                                ))}
+                            </p>
                             <p>{review.comment}</p>
                         </div>
                     ))
@@ -141,16 +147,19 @@ const ProductDetail = () => {
                     <h4>Viết đánh giá của bạn</h4>
                     <div className="form-group">
                         <label>Chọn số sao:</label>
-                        <select
-                            className="form-select mb-3"
-                            value={rating}
-                            onChange={(e) => setRating(Number(e.target.value))}
-                        >
-                            <option value="">Chọn...</option>
-                            {[1, 2, 3, 4, 5].map((num) => (
-                                <option key={num} value={num}>{num}</option>
+                        <div className="mb-3">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                                <FaStar
+                                    key={star}
+                                    size={30}
+                                    color={star <= (hover || rating) ? '#ffc107' : '#e4e5e9'}
+                                    onClick={() => setRating(star)}
+                                    onMouseEnter={() => setHover(star)}
+                                    onMouseLeave={() => setHover(null)}
+                                    style={{ cursor: 'pointer', transition: 'color 200ms' }}
+                                />
                             ))}
-                        </select>
+                        </div>
                     </div>
                     <div className="form-group">
                         <label>Viết nhận xét:</label>
