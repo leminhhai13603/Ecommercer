@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useContext } from 'react';
-import { getAllProducts, getAllCategories, getAllBrands } from '../api';
+import { getAllProducts, getAllCategories, getAllBrands, addToCart as apiAddToCart } from '../api';
 import { toast } from 'react-toastify';
 import { AuthContext } from '../contexts/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
@@ -61,29 +61,19 @@ const Home = () => {
 
     const handlePageClick = (event) => setCurrentPage(event.selected);
 
-    const addToCart = (product) => {
+    const addToCart = async (product) => {
         if (product.quantity <= 0) {
             toast.error('Sản phẩm đã hết hàng!');
             return;
         }
 
-        const cartItems = JSON.parse(localStorage.getItem('cart')) || [];
-        const existingItem = cartItems.find(item => item.product._id === product._id);
-
-        if (existingItem) {
-            if (existingItem.quantity < product.quantity) {
-                existingItem.quantity += 1;
-                toast.success('Đã thêm sản phẩm vào giỏ hàng!');
-            } else {
-                toast.error('Không đủ số lượng sản phẩm!');
-                return;
-            }
-        } else {
-            cartItems.push({ product, quantity: 1, color: product.color || 'default' });
+        try {
+            await apiAddToCart(product._id, 1, product.color || 'default');
             toast.success('Đã thêm sản phẩm vào giỏ hàng!');
+        } catch (error) {
+            console.error('Error adding to cart:', error);
+            toast.error('Không thể thêm sản phẩm vào giỏ hàng. Vui lòng thử lại.');
         }
-
-        localStorage.setItem('cart', JSON.stringify(cartItems));
     };
 
     const filteredAndSortedProducts = React.useMemo(() => {

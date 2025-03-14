@@ -1,18 +1,23 @@
 import React, { useContext, useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../contexts/AuthContext';
-import { FaShoppingCart, FaUserCircle, FaSignOutAlt, FaKey, } from 'react-icons/fa';
+import { FaShoppingCart, FaUserCircle, FaSignOutAlt, FaKey } from 'react-icons/fa';
 
 const Header = () => {
     const { isAuthenticated, setIsAuthenticated, user } = useContext(AuthContext);
     const navigate = useNavigate();
+    const location = useLocation();
     const [cartCount, setCartCount] = useState(0);
     const [dropdownOpen, setDropdownOpen] = useState(false);
 
+    const isAdminPage = location.pathname.startsWith('/admin');
+
     useEffect(() => {
-        const cartItems = JSON.parse(localStorage.getItem('cart')) || [];
-        setCartCount(cartItems.length);
-    }, []);
+        if (!isAdminPage) {
+            const cartItems = JSON.parse(localStorage.getItem('cart')) || [];
+            setCartCount(cartItems.length);
+        }
+    }, [isAdminPage]);
 
     const handleLogout = () => {
         localStorage.removeItem('token');
@@ -23,9 +28,16 @@ const Header = () => {
     return (
         <header className="bg-light shadow-sm border-bottom">
             <div className="container d-flex justify-content-between align-items-center py-2">
-                {/* Logo */}
+                {/* Logo hoặc Admin Title */}
                 <div className="d-flex align-items-center">
-                    <Link to="/" className="text-decoration-none fw-bold fs-4 text-primary me-4">E-Commerce</Link>
+                    {isAdminPage ? (
+                        <div className="d-flex align-items-center">
+                            <h4 className="mb-0 text-primary">Trang Quản Trị</h4>
+                            <span className="ms-2 badge bg-primary">Admin Dashboard</span>
+                        </div>
+                    ) : (
+                        <Link to="/" className="text-decoration-none fw-bold fs-4 text-primary me-4">CellphoneX</Link>
+                    )}
                 </div>
 
                 {/* Dropdown Người dùng */}
@@ -45,21 +57,25 @@ const Header = () => {
 
                             {dropdownOpen && (
                                 <ul className="dropdown-menu show position-absolute" style={{ top: '100%', right: 0 }}>
-                                    <li>
-                                        <Link to="/profile" className="dropdown-item">
-                                            <FaUserCircle className="me-2" /> Trang cá nhân
-                                        </Link>
-                                    </li>
-                                    <li>
-                                        <Link to="/order-history" className="dropdown-item">
-                                            <FaShoppingCart className="me-2" /> Lịch sử đơn hàng
-                                        </Link>
-                                    </li>
-                                    <li>
-                                        <Link to="/change-password" className="dropdown-item">
-                                            <FaKey className="me-2" /> Đổi mật khẩu
-                                        </Link>
-                                    </li>
+                                    {!isAdminPage && (
+                                        <>
+                                            <li>
+                                                <Link to="/profile" className="dropdown-item">
+                                                    <FaUserCircle className="me-2" /> Trang cá nhân
+                                                </Link>
+                                            </li>
+                                            <li>
+                                                <Link to="/order-history" className="dropdown-item">
+                                                    <FaShoppingCart className="me-2" /> Lịch sử đơn hàng
+                                                </Link>
+                                            </li>
+                                            <li>
+                                                <Link to="/change-password" className="dropdown-item">
+                                                    <FaKey className="me-2" /> Đổi mật khẩu
+                                                </Link>
+                                            </li>
+                                        </>
+                                    )}
                                     <li>
                                         <button onClick={handleLogout} className="dropdown-item">
                                             <FaSignOutAlt className="me-2" /> Đăng xuất
@@ -75,16 +91,18 @@ const Header = () => {
                         </>
                     )}
 
-                    {/* Giỏ hàng */}
-                    <Link to="/cart" className="btn btn-outline-success d-flex align-items-center position-relative">
-                        <FaShoppingCart size={22} />
-                        <span className="ms-1">Giỏ hàng</span>
-                        {cartCount > 0 && (
-                            <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
-                                {cartCount}
-                            </span>
-                        )}
-                    </Link>
+                    {/* Giỏ hàng - Chỉ hiển thị khi không phải trang admin */}
+                    {!isAdminPage && (
+                        <Link to="/cart" className="btn btn-outline-success d-flex align-items-center position-relative">
+                            <FaShoppingCart size={22} />
+                            <span className="ms-1">Giỏ hàng</span>
+                            {cartCount > 0 && (
+                                <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                                    {cartCount}
+                                </span>
+                            )}
+                        </Link>
+                    )}
                 </div>
             </div>
         </header>

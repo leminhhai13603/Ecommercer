@@ -259,7 +259,7 @@ export const deleteOrder = async (id) => {
     });
 };
 export const updateOrderStatus = async (id, status) => {
-    return await axios.put(`${API_URL}/order/${id}/status`, { status }, {
+    return await axios.put(`${API_URL}/user/order/${id}/status`, status, {
         headers: {
             Authorization: `Bearer ${getAuthToken()}`,
         },

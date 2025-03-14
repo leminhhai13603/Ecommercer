@@ -610,28 +610,42 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
             return res.status(400).json({ message: 'Trạng thái không được cung cấp' });
         }
 
-        const updateData = {
-            orderStatus: status,
-            'paymentInfo.status': status
-        };
-
-        // Nếu trạng thái là "Đã thanh toán", cập nhật paidAt
-        if (status === 'Đã thanh toán') {
-            updateData.paidAt = new Date();
+        // Kiểm tra trạng thái hợp lệ
+        const validStatuses = ['Đang xử lý', 'Đang giao hàng', 'Đã giao hàng', 'Đã hủy'];
+        if (!validStatuses.includes(status)) {
+            return res.status(400).json({ message: 'Trạng thái không hợp lệ' });
         }
 
-        const order = await Order.findByIdAndUpdate(
-            id, 
-            updateData,
-            { new: true }
-        );
-
+        const order = await Order.findById(id);
         if (!order) {
-            return res.status(404).json({ message: 'Không thể tìm thấy đơn hàng' });
-        } else
+            return res.status(404).json({ message: 'Không tìm thấy đơn hàng' });
+        }
+
+        // Kiểm tra logic chuyển trạng thái
+        const statusFlow = {
+            'Đang xử lý': ['Đang giao hàng', 'Đã hủy'],
+            'Đang giao hàng': ['Đã giao hàng', 'Đã hủy'],
+            'Đã giao hàng': [],
+            'Đã hủy': []
+        };
+
+        if (!statusFlow[order.orderStatus]?.includes(status)) {
+            return res.status(400).json({ 
+                message: `Không thể chuyển từ trạng thái "${order.orderStatus}" sang "${status}"` 
+            });
+        }
+
+        // Cập nhật trạng thái
+        order.orderStatus = status;
+        if (status === 'Đã giao hàng') {
+            order.deliveredAt = new Date();
+        }
+
+        await order.save();
 
         res.status(200).json({ 
-            message: 'Đơn hàng đã được cập nhật thành công', 
+            success: true,
+            message: 'Cập nhật trạng thái đơn hàng thành công',
             order 
         });
     } catch (error) {

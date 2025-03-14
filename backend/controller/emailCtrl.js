@@ -35,7 +35,7 @@ const sendEmail = asyncHandler(async (data) => {
         return info;
     } catch (error) {
         console.error('Lỗi trong quá trình gửi email:', error);
-        throw error; // Ném lỗi để xử lý ở cấp cao hơn
+        throw error;
     }
 });
 

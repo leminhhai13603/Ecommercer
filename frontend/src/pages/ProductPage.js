@@ -21,7 +21,7 @@ const ProductPage = () => {
     const [error, setError] = useState(null);
     const [showForm, setShowForm] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
-    const productsPerPage = 3;
+    const productsPerPage = 7;
 
     const fetchProducts = useCallback(async () => {
         try {
@@ -161,82 +161,156 @@ const ProductPage = () => {
     if (error) return <div className="alert alert-danger">{error}</div>;
 
     return (
-        <div className="container">
-            <h1 className="my-4">Quản lý Sản phẩm</h1>
-            <button className="btn btn-primary mb-4" onClick={() => setShowForm(!showForm)}>
-                {showForm ? 'Ẩn Form' : 'Thêm Sản phẩm'}
-            </button>
+        <div className="container mt-4">
+            <div className="d-flex justify-content-between align-items-center mb-4">
+                <h1>Quản lý Sản phẩm</h1>
+                <button 
+                    className="btn btn-primary"
+                    onClick={() => setShowForm(!showForm)}
+                >
+                    {showForm ? 'Ẩn Form' : 'Thêm Sản phẩm'}
+                </button>
+            </div>
+
+            {error && <div className="alert alert-danger">{error}</div>}
 
             {showForm && (
-                <form onSubmit={handleSubmit} className="mb-4">
-                    <input type="text" name="title" value={formData.title} onChange={handleChange} className="form-control mb-2" placeholder="Tên sản phẩm" required />
-                    <input type="number" name="price" value={formData.price} onChange={handleChange} className="form-control mb-2" placeholder="Giá sản phẩm" required />
-                    <textarea name="description" value={formData.description} onChange={handleChange} className="form-control mb-2" placeholder="Mô tả sản phẩm" required />
-                    <select name="category" value={formData.category} onChange={handleChange} className="form-control mb-2" required>
-                        <option value="">Chọn danh mục</option>
-                        {categories.map(category => (
-                            <option key={category._id} value={category._id}>{category.title}</option>
-                        ))}
-                    </select>
-                    <select name="brand" value={formData.brand} onChange={handleChange} className="form-control mb-2" required>
-                        <option value="">Chọn thương hiệu</option>
-                        {brands.map(brand => (
-                            <option key={brand._id} value={brand._id}>{brand.title}</option>
-                        ))}
-                    </select>
-                    <input type="number" name="quantity" value={formData.quantity} onChange={handleChange} className="form-control mb-2" placeholder="Số lượng sản phẩm" required />
-                    <input type="text" name="color" value={formData.color} onChange={handleChange} className="form-control mb-2" placeholder="Màu sắc" required />
-                    <input type="file" multiple onChange={handleFileChange} className="form-control mb-2" />
-                    {formData.images && formData.images.length > 0 && (
-                        <div className="mb-2">
-                            <p>Ảnh hiện tại:</p>
-                            {formData.images.map((image, index) => (
-                                <img key={index} src={image.url} alt={`Product ${index + 1}`} style={{width: '100px', height: '100px', objectFit: 'cover', marginRight: '10px'}} />
-                            ))}
-                        </div>
-                    )}
-                    <button type="submit" className="btn btn-success" disabled={isLoading}>
-                        {isLoading ? 'Đang xử lý...' : (editingProductId ? 'Cập nhật Sản phẩm' : 'Thêm Sản phẩm')}
-                    </button>
-                </form>
+                <div className="card mb-4">
+                    <div className="card-body">
+                        <form onSubmit={handleSubmit}>
+                            <div className="row">
+                                <div className="col-md-6 mb-3">
+                                    <input type="text" name="title" value={formData.title} onChange={handleChange} className="form-control" placeholder="Tên sản phẩm" required />
+                                </div>
+                                <div className="col-md-6 mb-3">
+                                    <input type="number" name="price" value={formData.price} onChange={handleChange} className="form-control" placeholder="Giá sản phẩm" required />
+                                </div>
+                            </div>
+                            <div className="mb-3">
+                                <textarea name="description" value={formData.description} onChange={handleChange} className="form-control" placeholder="Mô tả sản phẩm" rows="3" required />
+                            </div>
+                            <div className="row">
+                                <div className="col-md-6 mb-3">
+                                    <select name="category" value={formData.category} onChange={handleChange} className="form-control" required>
+                                        <option value="">Chọn danh mục</option>
+                                        {categories.map(category => (
+                                            <option key={category._id} value={category._id}>{category.title}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="col-md-6 mb-3">
+                                    <select name="brand" value={formData.brand} onChange={handleChange} className="form-control" required>
+                                        <option value="">Chọn thương hiệu</option>
+                                        {brands.map(brand => (
+                                            <option key={brand._id} value={brand._id}>{brand.title}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="row">
+                                <div className="col-md-6 mb-3">
+                                    <input type="number" name="quantity" value={formData.quantity} onChange={handleChange} className="form-control" placeholder="Số lượng sản phẩm" required />
+                                </div>
+                                <div className="col-md-6 mb-3">
+                                    <input type="text" name="color" value={formData.color} onChange={handleChange} className="form-control" placeholder="Màu sắc" required />
+                                </div>
+                            </div>
+                            <div className="mb-3">
+                                <input type="file" multiple onChange={handleFileChange} className="form-control" />
+                            </div>
+                            {formData.images && formData.images.length > 0 && (
+                                <div className="mb-3">
+                                    <p>Ảnh hiện tại:</p>
+                                    <div className="d-flex gap-2">
+                                        {formData.images.map((image, index) => (
+                                            <img key={index} src={image.url} alt={`Product ${index + 1}`} style={{width: '100px', height: '100px', objectFit: 'cover'}} />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            <button type="submit" className="btn btn-success" disabled={isLoading}>
+                                {isLoading ? 'Đang xử lý...' : (editingProductId ? 'Cập nhật Sản phẩm' : 'Thêm Sản phẩm')}
+                            </button>
+                        </form>
+                    </div>
+                </div>
             )}
 
-            <h2>Danh sách Sản phẩm</h2>
-            <ul className="list-group mb-4">
-                {currentProducts.map(product => (
-                    <li key={product._id} className="list-group-item d-flex justify-content-between align-items-center">
-                        <div>
-                            <h3>{product.title}</h3>
-                            <p>Giá: {product.price}</p>
-                            <p>Số lượng: {product.quantity}</p>
-                            <p>Màu sắc: {product.color}</p>
-                        </div>
-                        <div>
-                            {product.images && product.images.length > 0 && (
-                                <img src={product.images[0].url} alt={product.title} style={{width: '100px', height: '100px', objectFit: 'cover'}} />
-                            )}
-                        </div>
-                        <div>
-                            <button className="btn btn-warning me-2" onClick={() => handleEdit(product)} disabled={isLoading}>Sửa</button>
-                            <button className="btn btn-danger" onClick={() => handleDelete(product._id)} disabled={isLoading}>Xóa</button>
-                        </div>
-                    </li>
-                ))}
-            </ul>
+            {isLoading ? (
+                <div className="text-center">
+                    <div className="spinner-border" role="status">
+                        <span className="visually-hidden">Đang tải...</span>
+                    </div>
+                </div>
+            ) : (
+                <>
+                    <div className="table-responsive">
+                        <table className="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Hình ảnh</th>
+                                    <th>Tên sản phẩm</th>
+                                    <th>Giá</th>
+                                    <th>Số lượng</th>
+                                    <th>Màu sắc</th>
+                                    <th>Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {currentProducts.map(product => (
+                                    <tr key={product._id}>
+                                        <td>
+                                            {product.images && product.images.length > 0 && (
+                                                <img src={product.images[0].url} alt={product.title} style={{width: '50px', height: '50px', objectFit: 'cover'}} />
+                                            )}
+                                        </td>
+                                        <td>{product.title}</td>
+                                        <td>{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(product.price)}</td>
+                                        <td>{product.quantity}</td>
+                                        <td>{product.color}</td>
+                                        <td>
+                                            <button className="btn btn-warning btn-sm me-2" onClick={() => handleEdit(product)} disabled={isLoading}>
+                                                <i className="fas fa-edit"></i> Sửa
+                                            </button>
+                                            <button className="btn btn-danger btn-sm" onClick={() => handleDelete(product._id)} disabled={isLoading}>
+                                                <i className="fas fa-trash"></i> Xóa
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
 
-            <nav className="d-flex justify-content-between align-items-center">
-                <button className="btn btn-secondary" onClick={handlePrevPage} disabled={currentPage === 1}>Trước</button>
-                <ul className="pagination m-0">
-                    {[...Array(Math.ceil(products.length / productsPerPage)).keys()].map(number => (
-                        <li key={number + 1} className={`page-item ${currentPage === number + 1 ? 'active' : ''}`}>
-                            <button onClick={() => paginate(number + 1)} className="page-link">
-                                {number + 1}
-                            </button>
-                        </li>
-                    ))}
-                </ul>
-                <button className="btn btn-secondary" onClick={handleNextPage} disabled={currentPage === Math.ceil(products.length / productsPerPage)}>Sau</button>
-            </nav>
+                    <div className="d-flex justify-content-between align-items-center mt-4">
+                        <button 
+                            className="btn btn-outline-primary" 
+                            onClick={handlePrevPage} 
+                            disabled={currentPage === 1}
+                        >
+                            Trang trước
+                        </button>
+                        <div className="d-flex gap-2">
+                            {[...Array(Math.ceil(products.length / productsPerPage))].map((_, index) => (
+                                <button
+                                    key={index + 1}
+                                    className={`btn ${currentPage === index + 1 ? 'btn-primary' : 'btn-outline-primary'}`}
+                                    onClick={() => paginate(index + 1)}
+                                >
+                                    {index + 1}
+                                </button>
+                            ))}
+                        </div>
+                        <button 
+                            className="btn btn-outline-primary" 
+                            onClick={handleNextPage} 
+                            disabled={currentPage === Math.ceil(products.length / productsPerPage)}
+                        >
+                            Trang sau
+                        </button>
+                    </div>
+                </>
+            )}
         </div>
     );
 };

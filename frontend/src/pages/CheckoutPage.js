@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { createCheckoutOrder } from '../api';  // ✅ Gọi API từ file api.js
+import { createCheckoutOrder, getCart } from '../api';  // Thêm import getCart
 
 const CheckoutPage = () => {
     const [cartItems, setCartItems] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [shippingInfo, setShippingInfo] = useState({
         address: '',
         city: '',
@@ -14,8 +15,21 @@ const CheckoutPage = () => {
     const [paymentMethod, setPaymentMethod] = useState('COD');
 
     useEffect(() => {
-        const storedCart = JSON.parse(localStorage.getItem('cart')) || [];
-        setCartItems(storedCart);
+        const fetchCart = async () => {
+            try {
+                const response = await getCart();
+                if (response.data && response.data.items) {
+                    setCartItems(response.data.items);
+                }
+            } catch (error) {
+                console.error('Lỗi khi lấy giỏ hàng:', error);
+                toast.error('Không thể tải giỏ hàng');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchCart();
     }, []);
 
     const handleChange = (e) => {
@@ -27,37 +41,28 @@ const CheckoutPage = () => {
             toast.error('Vui lòng điền đầy đủ thông tin giao hàng');
             return;
         }
-    
-        const token = localStorage.getItem('token');
-    
+
         try {
             const productsToOrder = cartItems.map(item => ({
-                product: item.product?._id || item._id,
-                quantity: item.quantity || 1,
-                color: item.color || 'default',
-            })).filter(item => item.product);
+                product: item.product._id,
+                quantity: item.quantity,
+                color: item.color
+            }));
 
-            if (productsToOrder.length === 0) {
-                toast.error('Không có sản phẩm hợp lệ để đặt hàng.');
-                return;
-            }
+            const orderData = {
+                products: productsToOrder,
+                shippingInfo,
+                paymentInfo: {
+                    id: paymentMethod,
+                    status: 'Đang xử lý'
+                }
+            };
 
-            const response = await createCheckoutOrder(
-                {
-                    products: productsToOrder,
-                    shippingInfo,
-                    paymentInfo: {
-                        id: paymentMethod,
-                        status: 'Đang xử lý',
-                    }
-                },
-                token
-            );
+            const response = await createCheckoutOrder(orderData);
 
             if (response.status === 201) {
                 toast.success('Đặt hàng thành công!');
-                localStorage.removeItem('cart');  
-                window.location.href = '/order-history';  
+                window.location.href = '/order-history';
             }
         } catch (error) {
             console.error('Lỗi khi đặt hàng:', error);
@@ -66,8 +71,16 @@ const CheckoutPage = () => {
     };
 
     const calculateTotal = () => {
-        return cartItems.reduce((total, item) => total + (item.product?.price || 0) * (item.quantity || 1), 0);
+        return cartItems.reduce((total, item) => {
+            const price = item.product.price || 0;
+            const quantity = item.quantity || 1;
+            return total + (price * quantity);
+        }, 0);
     };
+
+    if (loading) {
+        return <div className="text-center mt-5">Đang tải...</div>;
+    }
 
     return (
         <div className="checkout-container d-flex justify-content-between" style={{ maxWidth: '1000px', margin: '0 auto' }}>
@@ -98,11 +111,11 @@ const CheckoutPage = () => {
                     cartItems.map((item, index) => (
                         <div key={index} className="d-flex justify-content-between align-items-center mb-3">
                             <div>
-                                <strong>{item.product?.title || 'Sản phẩm không tên'}</strong>
-                                <p>Số lượng: {item.quantity}</p>
+                                <strong>{item.product.title}</strong>
+                                <p className="mb-0">Số lượng: {item.quantity}</p>
                             </div>
                             <div>
-                                <span>{(item.product?.price * item.quantity).toLocaleString()} VNĐ</span>
+                                <span>{(item.product.price * item.quantity).toLocaleString()} VNĐ</span>
                             </div>
                         </div>
                     ))

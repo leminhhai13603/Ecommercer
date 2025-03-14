@@ -15,7 +15,6 @@ export const AuthProvider = ({ children }) => {
             try {
                 const decodedToken = jwtDecode(token);
 
-                // Kiểm tra token còn hạn
                 if (decodedToken.exp * 1000 > Date.now()) {
                     setIsAuthenticated(true);
                     setUser(decodedToken);
