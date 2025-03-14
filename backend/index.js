@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const path = require("path");
+const fs = require('fs');
 const dotenv = require('dotenv').config();
 const dbConnect = require('./config/dbConnect');
 
@@ -30,6 +31,15 @@ app.use(express.json());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 
+// ✅ Serve static files từ thư mục build
+const buildPath = path.join(__dirname, '../frontend/public');
+if (fs.existsSync(buildPath)) {
+    console.log('✅ Serving static files from:', buildPath);
+    app.use(express.static(buildPath));
+} else {
+    console.warn('⚠️ Build folder not found at:', buildPath);
+}
+
 // ✅ API routes
 app.use('/api/user', authRoute);
 app.use('/api/product-category', prodCategoryRoute);
@@ -49,9 +59,7 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// Xóa phần serve static files và React app
-
-// ✅ 404 handler cho API routes
+// ✅ Handle API 404
 app.use('/api/*', (req, res) => {
     res.status(404).json({ 
         error: "API endpoint không tồn tại",
@@ -59,13 +67,18 @@ app.use('/api/*', (req, res) => {
     });
 });
 
-// ✅ Trả về response cho các routes không phải API
-app.use('*', (req, res) => {
-    res.status(200).json({ 
-        message: "Backend server đang chạy",
-        env: process.env.NODE_ENV,
-        api: "Sử dụng /api/* để truy cập API endpoints"
-    });
+// ✅ Serve React app cho tất cả các routes khác
+app.get('*', (req, res) => {
+    const indexPath = path.join(buildPath, 'index.html');
+    if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+    } else {
+        res.status(404).json({ 
+            error: "Frontend build không tồn tại",
+            buildPath: buildPath,
+            indexPath: indexPath
+        });
+    }
 });
 
 // ✅ Error handler
