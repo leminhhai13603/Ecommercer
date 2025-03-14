@@ -3,17 +3,19 @@ const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 
 const orderSchema = new mongoose.Schema({
+    user: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
+    },
     products: [{
         product: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Product',
             required: true
         },
-        quantity: {
-            type: Number,
-            required: true
-        },
-        color : String,
+        quantity: Number,
+        color: String
     }],
     shippingInfo: {
         address: {
@@ -33,11 +35,6 @@ const orderSchema = new mongoose.Schema({
             required: true
         }
     },
-    user: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        required: true
-    },
     paymentInfo: {
         id: {
             type: String,
@@ -54,7 +51,7 @@ const orderSchema = new mongoose.Schema({
     },
     orderStatus: {
         type: String,
-        default: 'Đang xử lý',
+        default: "Đang xử lý",
         enum: ['Đang xử lý', 'Đang giao hàng', 'Đã giao hàng', 'Đã hủy']
     },
     deliveredAt: Date,

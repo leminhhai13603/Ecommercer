@@ -573,27 +573,60 @@ const createOrder = asyncHandler(async (req, res) => {
         });
     }
 });
-const getAllOrders = async (req, res) => {
+const getAllOrders = asyncHandler(async (req, res) => {
     try {
         const orders = await Order.find()
-            .populate('user', 'fullName email') 
-            .populate('products.product', 'title price images'); 
+            .populate({
+                path: 'products.product',
+                model: 'Product',
+                select: 'title price images'
+            })
+            .populate('user', 'firstname lastname email')
+            .sort({ createdAt: -1 });
 
-        res.status(200).json({ success: true, data: orders });
+        res.status(200).json(orders);
     } catch (error) {
-        console.error('Lỗi khi lấy danh sách đơn hàng:', error);
-        res.status(500).json({ message: 'Lỗi máy chủ, không thể lấy danh sách đơn hàng' });
+        res.status(500).json({ 
+            message: 'Có lỗi xảy ra khi lấy tất cả đơn hàng', 
+            error: error.message 
+        });
     }
-};
+});
 
 const getOrders = asyncHandler(async (req, res) => {
     const { _id } = req.user;
     validateMongodbId(_id);
+    
     try {
-        const orders = await Order.find({ user: _id });
-        res.status(200).json(orders);
+        // Đầu tiên lấy orders
+        let orders = await Order.find({ user: _id });
+        
+        // Manually populate products
+        orders = await Promise.all(orders.map(async (order) => {
+            const populatedProducts = await Promise.all(order.products.map(async (item) => {
+                const product = await Product.findById(item.product).select('title price images');
+                return {
+                    ...item.toObject(),
+                    product: product || null
+                };
+            }));
+
+            const orderObj = order.toObject();
+            orderObj.products = populatedProducts;
+            return orderObj;
+        }));
+
+        // Log để debug
+        console.log('Populated orders:', JSON.stringify(orders[0]?.products, null, 2));
+
+        res.json(orders);
     } catch (error) {
-        res.status(500).json({ message: 'Có lỗi xảy ra khi lấy đơn hàng', error: error.message });
+        console.error('Error in getOrders:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi lấy đơn hàng',
+            error: error.message
+        });
     }
 });
 

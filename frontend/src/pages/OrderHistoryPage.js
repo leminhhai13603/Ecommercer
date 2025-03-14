@@ -8,20 +8,25 @@ const OrderHistoryPage = () => {
     const [expandedOrderId, setExpandedOrderId] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [ordersPerPage] = useState(5);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const fetchOrders = async () => {
-            try {
-                const token = localStorage.getItem('token');
-                const response = await getUserOrders(token);
-                setOrders(response.data || []);
-            } catch (error) {
-                toast.error('Không thể tải danh sách đơn hàng.');
-            }
-        };
-
         fetchOrders();
     }, []);
+
+    const fetchOrders = async () => {
+        try {
+            setLoading(true);
+            const response = await getUserOrders();
+            console.log('API Response:', response.data);
+            setOrders(response.data);
+        } catch (error) {
+            console.error('Error:', error);
+            toast.error('Không thể tải đơn hàng');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const toggleOrderDetails = (orderId) => {
         setExpandedOrderId((prevId) => (prevId === orderId ? null : orderId));
@@ -55,6 +60,15 @@ const OrderHistoryPage = () => {
         window.scrollTo(0, 0); // Cuộn lên đầu trang
     };
 
+    const formatPrice = (price) => {
+        return new Intl.NumberFormat('vi-VN', {
+            style: 'currency',
+            currency: 'VND'
+        }).format(price);
+    };
+
+    if (loading) return <div>Đang tải...</div>;
+
     return (
         <div className="container my-5">
             <h2 className="text-center mb-4">Lịch Sử Đơn Hàng</h2>
@@ -69,26 +83,26 @@ const OrderHistoryPage = () => {
                             <div key={order._id} className="card mb-4 shadow-sm">
                                 <div className="card-header bg-white p-3">
                                     <div className="d-flex justify-content-between align-items-center">
-                                    <div>
-                                            <h5 className="mb-1">Đơn hàng #{order._id.slice(-8)}</h5>
+                                        <div>
+                                            <h5 className="mb-1">Đơn hàng #{order._id}</h5>
                                             <p className="mb-0 text-muted">
                                                 Ngày đặt: {new Date(order.createdAt).toLocaleDateString('vi-VN')}
                                             </p>
-                                    </div>
+                                        </div>
                                         <div className="d-flex align-items-center">
                                             <span className={`badge bg-${getStatusColor(order.orderStatus)} me-3`}>
                                                 {order.orderStatus}
                                             </span>
-                                    <button
+                                            <button
                                                 className="btn btn-outline-primary d-flex align-items-center"
-                                        onClick={() => toggleOrderDetails(order._id)}
-                                    >
+                                                onClick={() => toggleOrderDetails(order._id)}
+                                            >
                                                 {expandedOrderId === order._id ? (
                                                     <>Thu gọn <FaAngleUp className="ms-2" /></>
                                                 ) : (
                                                     <>Xem chi tiết <FaAngleDown className="ms-2" /></>
                                                 )}
-                                    </button>
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -98,35 +112,61 @@ const OrderHistoryPage = () => {
                                             <div className="col-md-8">
                                                 <h6 className="mb-3">Sản phẩm</h6>
                                                 <div className="table-responsive">
-                                                    <table className="table table-borderless">
+                                                    <table className="table">
                                                         <thead className="table-light">
                                                             <tr>
                                                                 <th>Tên sản phẩm</th>
                                                                 <th>Số lượng</th>
                                                                 <th>Màu sắc</th>
-                                                                <th>Giá</th>
+                                                                <th>Đơn giá</th>
+                                                                <th>Thành tiền</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
                                                             {order.products.map((item, index) => {
-                                                                const product = item.product;
+                                                                console.log('Item in order:', item);
                                                                 return (
                                                                     <tr key={index}>
-                                                                        <td>{product ? product.title : 'Sản phẩm không tồn tại'}</td>
+                                                                        <td>
+                                                                            {item.product ? (
+                                                                                <>
+                                                                                    {item.product.title}
+                                                                                    {item.product.images?.[0] && (
+                                                                                        <img
+                                                                                            src={item.product.images[0]}
+                                                                                            alt={item.product.title}
+                                                                                            style={{width: '50px', marginLeft: '10px'}}
+                                                                                        />
+                                                                                    )}
+                                                                                </>
+                                                                            ) : (
+                                                                                <span className="text-danger">Sản phẩm không tồn tại</span>
+                                                                            )}
+                                                                        </td>
                                                                         <td>{item.quantity}</td>
-                                                                        <td>{product && product.price ? `${product.price.toLocaleString('vi-VN')} VNĐ` : '0 VNĐ'}</td>
+                                                                        <td>{item.color || 'Không có'}</td>
+                                                                        <td>
+                                                                            {item.product ? formatPrice(item.product.price) : 'N/A'}
+                                                                        </td>
+                                                                        <td>
+                                                                            {item.product ? formatPrice(item.product.price * item.quantity) : 'N/A'}
+                                                                        </td>
                                                                     </tr>
                                                                 );
                                                             })}
                                                         </tbody>
-                                                        <tfoot>
+                                                        <tfoot className="table-light">
                                                             <tr>
-                                                                <td colSpan="3" className="text-end fw-bold">Tổng cộng:</td>
+                                                                <td colSpan="4" className="text-end fw-bold">
+                                                                    Tổng tiền:
+                                                                </td>
                                                                 <td className="fw-bold">
-                                                                    {order.products.reduce((total, item) => {
-                                                                        const price = item.product?.price || 0;
-                                                                        return total + (price * item.quantity);
-                                                                    }, 0).toLocaleString('vi-VN')} VNĐ
+                                                                    {formatPrice(order.products.reduce((total, item) => {
+                                                                        if (item.product && typeof item.product === 'object') {
+                                                                            return total + (item.product.price * item.quantity);
+                                                                        }
+                                                                        return total;
+                                                                    }, 0))}
                                                                 </td>
                                                             </tr>
                                                         </tfoot>
@@ -137,21 +177,22 @@ const OrderHistoryPage = () => {
                                                 <div className="shipping-info mb-4">
                                                     <h6 className="border-bottom pb-2">Thông tin giao hàng</h6>
                                                     <div className="p-2">
-                                                        <p className="mb-1"><strong>Địa chỉ:</strong> {order.shippingInfo?.address}</p>
-                                                        <p className="mb-1"><strong>Thành phố:</strong> {order.shippingInfo?.city}</p>
-                                                        <p className="mb-1"><strong>Mã bưu điện:</strong> {order.shippingInfo?.postalCode}</p>
+                                                        <p className="mb-1"><strong>Địa chỉ:</strong> {order.shippingInfo.address}</p>
+                                                        <p className="mb-1"><strong>Thành phố:</strong> {order.shippingInfo.city}</p>
+                                                        <p className="mb-1"><strong>Mã bưu điện:</strong> {order.shippingInfo.postalCode}</p>
+                                                        <p className="mb-1"><strong>Quốc gia:</strong> {order.shippingInfo.country}</p>
                                                     </div>
                                                 </div>
                                                 <div className="payment-info">
                                                     <h6 className="border-bottom pb-2">Thông tin thanh toán</h6>
                                                     <div className="p-2">
                                                         <p className="mb-1">
-                                                            <strong>Phương thức:</strong> {order.paymentInfo?.id}
+                                                            <strong>Mã thanh toán:</strong> {order.paymentInfo.id}
                                                         </p>
                                                         <p className="mb-1">
                                                             <strong>Trạng thái:</strong>{' '}
-                                                            <span className={`badge bg-${getStatusColor(order.paymentInfo?.status)}`}>
-                                                                {order.paymentInfo?.status}
+                                                            <span className={`badge bg-${getStatusColor(order.paymentInfo.status)}`}>
+                                                                {order.paymentInfo.status}
                                                             </span>
                                                         </p>
                                                     </div>

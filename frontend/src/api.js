@@ -226,20 +226,24 @@ export const deleteCoupon = async (id) => {
 };
 
 // API cho Orders
-export const getAllOrders = async (token) => {
+export const getAllOrders = async () => {
+    const token = localStorage.getItem('token');
     return await axios.get(`${API_URL}/user/get-orders`, {
         headers: {
-            Authorization: `Bearer ${getAuthToken()}`,
-        },
+            Authorization: `Bearer ${token}`
+        }
     });
 };
-export const getUserOrders = async (token) => {
+
+export const getUserOrders = async () => {
+    const token = localStorage.getItem('token');
     return await axios.get(`${API_URL}/user/get-order`, {
         headers: {
-            Authorization: `Bearer ${getAuthToken()}`,
-        },
+            Authorization: `Bearer ${token}`
+        }
     });
 };
+
 export const createCheckoutOrder = async (orderData) => {
     return await axios.post(`${API_URL}/user/create-order`, orderData, {
         headers: {
