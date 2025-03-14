@@ -50,7 +50,7 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 
 // ✅ Serve static files từ thư mục build
-const buildPath = path.join(__dirname, '../frontend/build');
+const buildPath = path.join(__dirname, '../frontend/public');
 if (fs.existsSync(buildPath)) {
     console.log('✅ Serving static files from:', buildPath);
     app.use(express.static(buildPath));
