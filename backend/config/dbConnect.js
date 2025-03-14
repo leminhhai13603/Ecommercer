@@ -10,21 +10,20 @@ const dbConnect = async () => {
             w: 'majority'
         });
         
-        console.log('Database connected successfully to:', conn.connection.host);
+        console.log('✅ Database connected successfully to:', conn.connection.host);
         
-        // Thêm event listeners
         mongoose.connection.on('error', (err) => {
-            console.error('MongoDB connection error:', err);
+            console.error('❌ MongoDB connection error:', err);
         });
 
         mongoose.connection.on('disconnected', () => {
-            console.log('MongoDB disconnected');
+            console.log('⚠️ MongoDB disconnected');
+            setTimeout(dbConnect, 5000);
         });
 
     } catch (error) {
-        console.error('Database connection failed:', error.message);
-        console.error('Full error:', error);
-        process.exit(1);
+        console.error('❌ Database connection failed:', error.message);
+        setTimeout(dbConnect, 5000);
     }
 };
 
