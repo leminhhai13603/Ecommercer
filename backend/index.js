@@ -30,11 +30,6 @@ app.use(express.json());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 
-// ✅ Serve static files từ frontend build trong production
-if (process.env.NODE_ENV === 'production') {
-    app.use(express.static(path.join(__dirname, '../frontend/build')));
-}
-
 // ✅ API routes
 app.use('/api/user', authRoute);
 app.use('/api/product-category', prodCategoryRoute);
@@ -54,18 +49,22 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// ✅ Serve React app trong production
-if (process.env.NODE_ENV === 'production') {
-    app.get('*', (req, res) => {
-        res.sendFile(path.join(__dirname, '../frontend/build/index.html'));
-    });
-}
+// Xóa phần serve static files và React app
 
-// ✅ 404 handler
-app.use((req, res) => {
+// ✅ 404 handler cho API routes
+app.use('/api/*', (req, res) => {
     res.status(404).json({ 
-        error: "Không tìm thấy route này!",
+        error: "API endpoint không tồn tại",
         path: req.path
+    });
+});
+
+// ✅ Trả về response cho các routes không phải API
+app.use('*', (req, res) => {
+    res.status(200).json({ 
+        message: "Backend server đang chạy",
+        env: process.env.NODE_ENV,
+        api: "Sử dụng /api/* để truy cập API endpoints"
     });
 });
 
