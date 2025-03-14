@@ -6,7 +6,7 @@
     "start": "node index.js",
     "dev": "nodemon index.js",
     "serve": "nodemon index.js",
-    "build": "echo 'No build required'",
+    "build": "cd ../frontend && npm install && npm run build'",
     "test": "echo \"Error: no test specified\" && exit 1",
     "deploy": "npm install && npm start"
   },
