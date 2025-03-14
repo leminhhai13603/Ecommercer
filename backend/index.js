@@ -18,6 +18,24 @@ const couponRoute = require('./routes/couponRoute');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Thêm logging để debug
+console.log('=== DEBUGGING SERVER START ===');
+console.log('Current directory:', __dirname);
+console.log('Parent directory:', path.join(__dirname, '..'));
+try {
+    console.log('Parent directory contents:', fs.readdirSync(path.join(__dirname, '..')));
+    const frontendPath = path.join(__dirname, '../frontend');
+    console.log('Frontend directory contents:', fs.readdirSync(frontendPath));
+    const buildPath = path.join(__dirname, '../frontend/build');
+    if (fs.existsSync(buildPath)) {
+        console.log('Build directory contents:', fs.readdirSync(buildPath));
+    } else {
+        console.log('❌ Build directory not found at:', buildPath);
+    }
+} catch (error) {
+    console.error('Error checking directories:', error);
+}
+
 // ✅ Kết nối database
 dbConnect();
 
@@ -32,7 +50,7 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 
 // ✅ Serve static files từ thư mục build
-const buildPath = path.join(__dirname, '../frontend/public');
+const buildPath = path.join(__dirname, '../frontend/build');
 if (fs.existsSync(buildPath)) {
     console.log('✅ Serving static files from:', buildPath);
     app.use(express.static(buildPath));
@@ -68,15 +86,23 @@ app.use('/api/*', (req, res) => {
 });
 
 // ✅ Serve React app cho tất cả các routes khác
-app.get('*', (req, res) => {
+app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) {
+        return next();
+    }
+    
     const indexPath = path.join(buildPath, 'index.html');
+    console.log('Trying to serve:', indexPath);
     if (fs.existsSync(indexPath)) {
+        console.log('✅ Serving index.html');
         res.sendFile(indexPath);
     } else {
+        console.log('❌ index.html not found');
         res.status(404).json({ 
             error: "Frontend build không tồn tại",
             buildPath: buildPath,
-            indexPath: indexPath
+            indexPath: indexPath,
+            currentDir: __dirname
         });
     }
 });
