@@ -43,6 +43,29 @@ const productSchema = new mongoose.Schema({
         type: String,
         required: false,
     },
+    size: {
+        type: mongoose.Schema.Types.Mixed,
+        validate: {
+            validator: function(value) {
+                if (typeof value === 'string') {
+                    return ['S', 'M', 'L', 'XL', 'XXL', 'Free Size'].includes(value);
+                }
+                if (Array.isArray(value)) {
+                    return value.every(size => 
+                        ['S', 'M', 'L', 'XL', 'XXL', 'Free Size'].includes(size)
+                    );
+                }
+                return false;
+            },
+            message: 'Size không hợp lệ! Các giá trị cho phép: S, M, L, XL, XXL, Free Size'
+        },
+        default: 'Free Size',
+    },
+    gender: {
+        type: String,
+        enum: ['Nam', 'Nữ', 'Unisex'],
+        default: 'Unisex',
+    },
     ratings: [
         {
             star: Number,
@@ -53,8 +76,11 @@ const productSchema = new mongoose.Schema({
     totalrating: {
         type: String,
         default: 0,
+    },
+    coupon: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Coupon'
     }
-    
 }, {timestamps: true});
 
 module.exports = mongoose.model('Product', productSchema);

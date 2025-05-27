@@ -9,7 +9,9 @@ const {
     addToWishlist, 
     rating,
     uploadImage,
-    deleteImage
+    deleteImage,
+    applyProductCoupon,
+    removeProductCoupon
 } = require('../controller/productCtrl');
 const {authMiddleware, isAdmin} = require('../middlewares/authMiddleware');
 const { uploader, productImageResize } = require('../middlewares/uploadimages');
@@ -37,5 +39,8 @@ router.delete(
     isAdmin,
     deleteImage
 );
+
+router.post('/coupon/apply/:productId', authMiddleware, isAdmin, applyProductCoupon);
+router.delete('/coupon/:productId', authMiddleware, isAdmin, removeProductCoupon);
 
 module.exports = router;

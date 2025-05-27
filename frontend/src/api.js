@@ -70,6 +70,23 @@ export const deleteProduct = async (id) => {
         },
     });
 };
+
+export const applyProductCoupon = async (productId, couponId) => {
+    return await axios.post(`${API_URL}/product/coupon/apply/${productId}`, { couponId }, {
+        headers: {
+            Authorization: `Bearer ${getAuthToken()}`,
+        },
+    });
+};
+
+export const removeProductCoupon = async (productId) => {
+    return await axios.delete(`${API_URL}/product/coupon/${productId}`, {
+        headers: {
+            Authorization: `Bearer ${getAuthToken()}`,
+        },
+    });
+};
+
 export const submitProductRating = async (data) => {
     const token = localStorage.getItem('token');
     return await axios.post(`${API_URL}/product/rating`, data, {
@@ -78,7 +95,6 @@ export const submitProductRating = async (data) => {
         },
     });
 };
-
 
 // API cho Brands
 export const getAllBrands = async () => {
@@ -225,14 +241,39 @@ export const deleteCoupon = async (id) => {
     });
 };
 
+export const applyCoupon = async (couponName) => {
+    const token = getAuthToken();
+    return await axios.post(`${API_URL}/user/apply-coupon`, { coupon: couponName }, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+};
+
 // API cho Orders
 export const getAllOrders = async () => {
     const token = localStorage.getItem('token');
-    return await axios.get(`${API_URL}/user/get-orders`, {
-        headers: {
-            Authorization: `Bearer ${token}`
+    try {
+        const response = await axios.get(`${API_URL}/user/get-orders`, {
+            headers: {
+                Authorization: `Bearer ${token}`
+            }
+        });
+        
+        // Kiểm tra và ghi log để debug
+        console.log("API Response:", response.data);
+        
+        // Đảm bảo response có đúng cấu trúc
+        if (!response.data.data && Array.isArray(response.data)) {
+            // Nếu response.data là một mảng, trả về đúng định dạng
+            return { data: { data: response.data } };
         }
-    });
+        
+        return response;
+    } catch (error) {
+        console.error("Error in getAllOrders:", error);
+        throw error;
+    }
 };
 
 export const getUserOrders = async () => {
@@ -345,9 +386,9 @@ export const uploadProductImage = (id, formData) => {
         },
     });
 };
-export const addToCart = async (productId, quantity, color) => {
+export const addToCart = async (productId, count, color, size = 'Free Size') => {
     const token = getAuthToken();
-    return await axios.post(`${API_URL}/user/cart`, { productId, quantity, color }, {
+    return await axios.post(`${API_URL}/user/cart`, { productId, count, color, size }, {
         headers: {
             Authorization: `Bearer ${token}`,
         },
@@ -363,21 +404,54 @@ export const getCart = async () => {
     });
 };
 
-export const updateCartItem = async (productId, color, quantity) => {
+export const updateCartItem = async (productId, color, quantity, size = 'Free Size') => {
     const token = getAuthToken();
-    return await axios.put(`${API_URL}/user/cart/update-quantity`, { productId, color, quantity }, {
+    return await axios.put(`${API_URL}/user/cart/update-quantity`, { productId, color, quantity, size }, {
         headers: {
             Authorization: `Bearer ${token}`,
         },
     });
 };
 
-export const removeFromCart = async (productId, color) => {
+export const removeFromCart = async (productId, color, size = 'Free Size') => {
     const token = getAuthToken();
     return await axios.delete(`${API_URL}/user/remove-cart`, {
         headers: {
             Authorization: `Bearer ${token}`,
         },
-        data: { productId, color }
+        data: { productId, color, size }
     });
+};
+
+// API cho Chatbot
+export const sendChatbotQuery = async (query, sessionId = 'default') => {
+  return await axios.post(`${API_URL}/chatbot/query`, { query, sessionId });
+};
+
+export const getChatbotSuggestions = async () => {
+  return await axios.get(`${API_URL}/chatbot/suggest`);
+};
+
+export const clearChatbotCache = async () => {
+  return await axios.delete(`${API_URL}/chatbot/cache`, {
+    headers: {
+      Authorization: `Bearer ${getAuthToken()}`,
+    },
+  });
+};
+
+export const getChatbotHistory = async (sessionId = 'default') => {
+  return await axios.get(`${API_URL}/chatbot/history/${sessionId}`, {
+    headers: {
+      Authorization: `Bearer ${getAuthToken()}`,
+    },
+  });
+};
+
+export const clearChatbotHistory = async (sessionId = 'default') => {
+  return await axios.delete(`${API_URL}/chatbot/history/${sessionId}`, {
+    headers: {
+      Authorization: `Bearer ${getAuthToken()}`,
+    },
+  });
 };

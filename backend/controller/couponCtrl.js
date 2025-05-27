@@ -2,8 +2,6 @@ const Coupon = require('../models/couponModel');
 const asyncHandler = require('express-async-handler');
 const validateMongoDbId = require('../utils/validateMongodbid');
 
-// Tạo mã giảm giá mới
-// Tạo mã giảm giá mới
 const createCoupon = asyncHandler(async (req, res) => {
     try {
         const existingCoupon = await Coupon.findOne({ name: req.body.name });

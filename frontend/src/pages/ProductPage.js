@@ -1,5 +1,6 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { getAllProducts, createProduct, updateProduct, deleteProduct, getAllCategories, getAllBrands, uploadProductImage } from '../api';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { getAllProducts, createProduct, updateProduct, deleteProduct, getAllCategories, getAllBrands, uploadProductImage, getAllCoupons, applyProductCoupon, removeProductCoupon } from '../api';
+import { toast } from 'react-toastify';
 
 const ProductPage = () => {
     const [products, setProducts] = useState([]);
@@ -11,17 +12,36 @@ const ProductPage = () => {
         brand: '',
         quantity: '',
         color: '',
+        size: ['Free Size'],
+        gender: 'Unisex',
         images: []
     });
     const [editingProductId, setEditingProductId] = useState(null);
     const [categories, setCategories] = useState([]);
     const [brands, setBrands] = useState([]);
     const [selectedFiles, setSelectedFiles] = useState([]);
+    const [pastedImages, setPastedImages] = useState([]);
+    const [previewImages, setPreviewImages] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
     const [showForm, setShowForm] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const productsPerPage = 7;
+    
+    // Danh sách size có sẵn
+    const availableSizes = ['S', 'M', 'L', 'XL', 'XXL', 'Free Size'];
+    
+    // State để lưu các màu sắc khi người dùng thêm nhiều màu
+    const [colorInput, setColorInput] = useState('');
+    const [colorList, setColorList] = useState([]);
+
+    const imageInputRef = useRef(null);
+    const pasteDivRef = useRef(null);
+
+    const [coupons, setCoupons] = useState([]);
+    const [showCouponModal, setShowCouponModal] = useState(false);
+    const [selectedProductForCoupon, setSelectedProductForCoupon] = useState(null);
+    const [selectedCouponId, setSelectedCouponId] = useState('');
 
     const fetchProducts = useCallback(async () => {
         try {
@@ -54,22 +74,178 @@ const ProductPage = () => {
         }
     }, []);
 
+    const fetchCoupons = useCallback(async () => {
+        try {
+            const response = await getAllCoupons();
+            setCoupons(response.data);
+        } catch (error) {
+            console.error('Lỗi khi lấy danh sách mã giảm giá:', error);
+        }
+    }, []);
+
     useEffect(() => {
         fetchProducts();
         fetchCategories();
         fetchBrands();
-    }, [fetchProducts, fetchCategories, fetchBrands]);
+        fetchCoupons();
+    }, [fetchProducts, fetchCategories, fetchBrands, fetchCoupons]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prevData => ({ ...prevData, [name]: value }));
     };
+    
+    // Xử lý thêm màu vào danh sách
+    const handleAddColor = () => {
+        if (colorInput.trim()) {
+            const newColors = [...colorList, colorInput.trim()];
+            setColorList(newColors);
+            setFormData(prevData => ({ 
+                ...prevData, 
+                color: newColors.join(', ') 
+            }));
+            setColorInput('');
+        }
+    };
+    
+    // Xóa màu khỏi danh sách
+    const handleRemoveColor = (colorToRemove) => {
+        const updatedColors = colorList.filter(color => color !== colorToRemove);
+        setColorList(updatedColors);
+        setFormData(prevData => ({ 
+            ...prevData, 
+            color: updatedColors.join(', ') 
+        }));
+    };
+    
+    // Xử lý chọn nhiều size
+    const handleSizeToggle = (size) => {
+        const currentSizes = Array.isArray(formData.size) ? formData.size : [formData.size];
+        
+        if (currentSizes.includes(size)) {
+            // Nếu đã có size này rồi thì xóa đi (trừ khi đây là size cuối cùng)
+            if (currentSizes.length > 1) {
+                const updatedSizes = currentSizes.filter(s => s !== size);
+                setFormData(prevData => ({ ...prevData, size: updatedSizes }));
+            }
+        } else {
+            // Nếu chưa có size này thì thêm vào
+            const updatedSizes = [...currentSizes, size];
+            setFormData(prevData => ({ ...prevData, size: updatedSizes }));
+        }
+    };
 
     const handleFileChange = (e) => {
         if (e.target.files) {
-            setSelectedFiles(Array.from(e.target.files));
+            const files = Array.from(e.target.files);
+            setSelectedFiles(prevFiles => [...prevFiles, ...files]);
+            
+            // Tạo preview cho các file mới
+            files.forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    setPreviewImages(prev => [...prev, {
+                        url: e.target.result,
+                        file: file,
+                        name: file.name
+                    }]);
+                };
+                reader.readAsDataURL(file);
+            });
         }
     };
+    
+    // Hàm xử lý sự kiện paste
+    const handlePaste = (e) => {
+        // Chỉ xử lý paste nếu đang focus vào vùng paste ảnh hoặc đang ở trong form
+        const isInputElement = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
+        
+        // Nếu đang focus vào input hoặc textarea thì không xử lý paste ảnh
+        if (isInputElement) {
+            return;
+        }
+        
+        if (e.clipboardData) {
+            const items = e.clipboardData.items;
+            let hasImage = false;
+            let imageFile = null;
+            
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    hasImage = true;
+                    imageFile = items[i].getAsFile();
+                    break;
+                }
+            }
+            
+            // Chỉ chặn sự kiện mặc định nếu là paste ảnh
+            if (hasImage) {
+                e.preventDefault();
+                
+                // Tạo tên file ngẫu nhiên
+                const timestamp = new Date().getTime();
+                const randomString = Math.random().toString(36).substring(2, 8);
+                const fileName = `pasted_image_${timestamp}_${randomString}.png`;
+                
+                // Tạo file mới với tên đã đặt
+                const renamedFile = new File([imageFile], fileName, { type: imageFile.type });
+                
+                setSelectedFiles(prevFiles => [...prevFiles, renamedFile]);
+                setPastedImages(prev => [...prev, renamedFile]);
+                
+                // Tạo preview
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    setPreviewImages(prev => [...prev, {
+                        url: e.target.result,
+                        file: renamedFile,
+                        name: fileName
+                    }]);
+                };
+                reader.readAsDataURL(renamedFile);
+                
+                // Hiển thị thông báo
+                toast.success('Đã dán ảnh thành công');
+            }
+        }
+    };
+    
+    // Focus vào div paste khi click
+    const focusPasteArea = () => {
+        if (pasteDivRef.current) {
+            pasteDivRef.current.focus();
+        }
+    };
+    
+    // Xóa một ảnh preview
+    const removePreviewImage = (index) => {
+        const imageToRemove = previewImages[index];
+        setPreviewImages(previewImages.filter((_, i) => i !== index));
+        setSelectedFiles(selectedFiles.filter(file => 
+            file.name !== imageToRemove.name || 
+            file.lastModified !== imageToRemove.file.lastModified
+        ));
+    };
+
+    useEffect(() => {
+        // Reset state khi bắt đầu chỉnh sửa hoặc tạo mới
+        if (!editingProductId) {
+            setPreviewImages([]);
+            setPastedImages([]);
+            setSelectedFiles([]);
+        }
+    }, [editingProductId, showForm]);
+
+    // Add paste event listener to document
+    useEffect(() => {
+        // Chỉ sử dụng một event listener ở cấp document
+        if (showForm) {
+            document.addEventListener('paste', handlePaste);
+        }
+        return () => {
+            document.removeEventListener('paste', handlePaste);
+        };
+    }, [showForm]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -77,6 +253,12 @@ const ProductPage = () => {
         setError(null);
         try {
             let productData = { ...formData };
+            
+            // Chuyển đổi mảng size thành chuỗi nếu chỉ có một phần tử
+            if (Array.isArray(productData.size) && productData.size.length === 1) {
+                productData.size = productData.size[0];
+            }
+            
             let productId;
 
             if (editingProductId) {
@@ -107,10 +289,15 @@ const ProductPage = () => {
                 brand: '',
                 quantity: '',
                 color: '',
+                size: ['Free Size'],
+                gender: 'Unisex',
                 images: []
             });
+            setColorList([]);
             setEditingProductId(null);
             setSelectedFiles([]);
+            setPreviewImages([]);
+            setPastedImages([]);
             setShowForm(false);
             await fetchProducts();
         } catch (error) {
@@ -121,6 +308,20 @@ const ProductPage = () => {
     };
 
     const handleEdit = (product) => {
+        // Xử lý màu sắc từ chuỗi thành mảng để hiển thị
+        const colorArray = product.color ? 
+            product.color.split(',').map(c => c.trim()) : [];
+        
+        // Xử lý size từ chuỗi hoặc mảng
+        let sizeArray = [];
+        if (typeof product.size === 'string') {
+            sizeArray = [product.size];
+        } else if (Array.isArray(product.size)) {
+            sizeArray = product.size;
+        } else {
+            sizeArray = ['Free Size'];
+        }
+
         setFormData({
             title: product.title || '',
             price: product.price || '',
@@ -129,8 +330,12 @@ const ProductPage = () => {
             brand: product.brand || '',
             quantity: product.quantity || '',
             color: product.color || '',
+            size: sizeArray,
+            gender: product.gender || 'Unisex',
             images: product.images || []
         });
+        
+        setColorList(colorArray);
         setEditingProductId(product._id);
         setShowForm(true);
     };
@@ -156,6 +361,77 @@ const ProductPage = () => {
     const paginate = (pageNumber) => setCurrentPage(pageNumber);
     const handlePrevPage = () => setCurrentPage(prevPage => Math.max(prevPage - 1, 1));
     const handleNextPage = () => setCurrentPage(prevPage => Math.min(prevPage + 1, Math.ceil(products.length / productsPerPage)));
+
+    // Hiển thị màu sắc và size dưới dạng chuỗi để hiển thị trong bảng
+    const displayColors = (colors) => {
+        if (!colors) return 'Không có';
+        return colors;
+    };
+
+    const displaySizes = (sizes) => {
+        if (!sizes) return 'Free Size';
+        if (Array.isArray(sizes)) return sizes.join(', ');
+        return sizes;
+    };
+
+    // Hiển thị modal áp dụng mã giảm giá
+    const openCouponModal = (product) => {
+        setSelectedProductForCoupon(product);
+        setSelectedCouponId(product.coupon || '');
+        setShowCouponModal(true);
+    };
+
+    // Đóng modal mã giảm giá
+    const closeCouponModal = () => {
+        setShowCouponModal(false);
+        setSelectedProductForCoupon(null);
+        setSelectedCouponId('');
+    };
+
+    // Xử lý khi chọn mã giảm giá
+    const handleCouponChange = (e) => {
+        setSelectedCouponId(e.target.value);
+    };
+
+    // Áp dụng mã giảm giá cho sản phẩm
+    const handleApplyCoupon = async () => {
+        try {
+            if (!selectedProductForCoupon) return;
+            
+            if (!selectedCouponId) {
+                // Nếu không chọn mã giảm giá, thì xóa mã giảm giá hiện có
+                await removeProductCoupon(selectedProductForCoupon._id);
+                toast.success('Đã xóa mã giảm giá khỏi sản phẩm');
+            } else {
+                // Áp dụng mã giảm giá mới
+                await applyProductCoupon(selectedProductForCoupon._id, selectedCouponId);
+                toast.success('Đã áp dụng mã giảm giá cho sản phẩm');
+            }
+            
+            // Cập nhật lại danh sách sản phẩm
+            fetchProducts();
+            closeCouponModal();
+        } catch (error) {
+            console.error('Lỗi khi áp dụng mã giảm giá:', error);
+            toast.error('Không thể áp dụng mã giảm giá. Vui lòng thử lại.');
+        }
+    };
+    
+    // Hiển thị thông tin mã giảm giá của sản phẩm
+    const displayCoupon = (product) => {
+        if (!product.coupon) return 'Không có';
+        
+        // Nếu coupon đã được populate thành object
+        if (typeof product.coupon === 'object') {
+            return `${product.coupon.name} (${product.coupon.discount}%)`;
+        }
+        
+        // Nếu coupon là id, tìm trong danh sách coupons
+        const coupon = coupons.find(c => c._id === product.coupon);
+        if (!coupon) return 'Không xác định';
+        
+        return `${coupon.name} (${coupon.discount}%)`;
+    };
 
     if (isLoading) return <div>Đang tải...</div>;
     if (error) return <div className="alert alert-danger">{error}</div>;
@@ -209,25 +485,161 @@ const ProductPage = () => {
                             </div>
                             <div className="row">
                                 <div className="col-md-6 mb-3">
-                                    <input type="number" name="quantity" value={formData.quantity} onChange={handleChange} className="form-control" placeholder="Số lượng sản phẩm" required />
+                                    <input type="number" name="quantity" value={formData.quantity} onChange={handleChange} className="form-control" placeholder="Số lượng" required />
                                 </div>
                                 <div className="col-md-6 mb-3">
-                                    <input type="text" name="color" value={formData.color} onChange={handleChange} className="form-control" placeholder="Màu sắc" required />
+                                    <select name="gender" value={formData.gender} onChange={handleChange} className="form-control">
+                                        <option value="Unisex">Unisex</option>
+                                        <option value="Nam">Nam</option>
+                                        <option value="Nữ">Nữ</option>
+                                    </select>
                                 </div>
                             </div>
+                            
+                            {/* Phần thêm nhiều màu */}
                             <div className="mb-3">
-                                <input type="file" multiple onChange={handleFileChange} className="form-control" />
+                                <label className="form-label">Màu sắc (thêm nhiều màu)</label>
+                                <div className="input-group mb-2">
+                                    <input 
+                                        type="text" 
+                                        value={colorInput} 
+                                        onChange={(e) => setColorInput(e.target.value)} 
+                                        className="form-control" 
+                                        placeholder="Nhập màu sắc" 
+                                    />
+                                    <button 
+                                        type="button" 
+                                        className="btn btn-outline-primary" 
+                                        onClick={handleAddColor}
+                                    >
+                                        Thêm màu
+                                    </button>
+                                </div>
+                                <div className="d-flex flex-wrap gap-2 mt-2">
+                                    {colorList.map((color, index) => (
+                                        <div key={index} className="badge bg-primary d-flex align-items-center p-2">
+                                            {color}
+                                            <button 
+                                                type="button" 
+                                                className="btn-close btn-close-white ms-2" 
+                                                style={{ fontSize: '0.65rem' }} 
+                                                onClick={() => handleRemoveColor(color)}
+                                            ></button>
+                                        </div>
+                                    ))}
+                                </div>
+                                {colorList.length === 0 && (
+                                    <small className="text-muted">Chưa có màu nào được thêm</small>
+                                )}
                             </div>
-                            {formData.images && formData.images.length > 0 && (
+                            
+                            {/* Phần chọn nhiều size */}
+                            <div className="mb-3">
+                                <label className="form-label">Kích thước (chọn nhiều size)</label>
+                                <div className="d-flex flex-wrap gap-2">
+                                    {availableSizes.map((size, index) => {
+                                        const isSelected = Array.isArray(formData.size) 
+                                            ? formData.size.includes(size) 
+                                            : formData.size === size;
+                                        
+                                        return (
+                                            <button 
+                                                key={index}
+                                                type="button"
+                                                className={`btn ${isSelected ? 'btn-primary' : 'btn-outline-primary'}`}
+                                                onClick={() => handleSizeToggle(size)}
+                                            >
+                                                {size}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                <small className="text-muted">Size đã chọn: {displaySizes(formData.size)}</small>
+                            </div>
+                            
+                            {/* Phần upload và paste ảnh */}
+                            <div className="mb-3">
+                                <label className="form-label">Hình ảnh sản phẩm</label>
+                                <div className="d-flex flex-column gap-2">
+                                    <input 
+                                        type="file" 
+                                        multiple 
+                                        onChange={handleFileChange} 
+                                        className="form-control"
+                                        ref={imageInputRef}
+                                    />
+                                    
+                                    <div 
+                                        ref={pasteDivRef}
+                                        onClick={focusPasteArea}
+                                        // Bỏ event onPaste ở đây để tránh xử lý trùng lặp
+                                        className="form-control text-center p-3 mt-2 border border-dashed"
+                                        style={{ 
+                                            minHeight: '100px', 
+                                            cursor: 'pointer',
+                                            borderStyle: 'dashed'
+                                        }}
+                                        tabIndex="0"
+                                    >
+                                        <p className="mb-0 text-muted">Click vào đây và paste (Ctrl+V) để dán ảnh từ clipboard</p>
+                                        <small className="text-muted d-block mt-1">hoặc paste ở bất kỳ đâu trên trang</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Hiển thị preview ảnh mới */}
+                            {previewImages.length > 0 && (
                                 <div className="mb-3">
-                                    <p>Ảnh hiện tại:</p>
-                                    <div className="d-flex gap-2">
-                                        {formData.images.map((image, index) => (
-                                            <img key={index} src={image.url} alt={`Product ${index + 1}`} style={{width: '100px', height: '100px', objectFit: 'cover'}} />
+                                    <p>Ảnh đã chọn:</p>
+                                    <div className="d-flex flex-wrap gap-2">
+                                        {previewImages.map((image, index) => (
+                                            <div key={index} className="position-relative" style={{ width: '100px' }}>
+                                                <img 
+                                                    src={image.url} 
+                                                    alt={`Preview ${index}`} 
+                                                    style={{
+                                                        width: '100px', 
+                                                        height: '100px', 
+                                                        objectFit: 'cover',
+                                                        borderRadius: '4px'
+                                                    }} 
+                                                />
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-danger btn-sm position-absolute top-0 end-0"
+                                                    style={{ fontSize: '0.7rem', padding: '0.1rem 0.3rem' }}
+                                                    onClick={() => removePreviewImage(index)}
+                                                >
+                                                    ×
+                                                </button>
+                                            </div>
                                         ))}
                                     </div>
                                 </div>
                             )}
+                            
+                            {/* Hiển thị ảnh hiện tại của sản phẩm khi đang chỉnh sửa */}
+                            {formData.images && formData.images.length > 0 && (
+                                <div className="mb-3">
+                                    <p>Ảnh hiện tại của sản phẩm:</p>
+                                    <div className="d-flex flex-wrap gap-2">
+                                        {formData.images.map((image, index) => (
+                                            <img 
+                                                key={index} 
+                                                src={image.url} 
+                                                alt={`Product ${index + 1}`} 
+                                                style={{
+                                                    width: '100px', 
+                                                    height: '100px', 
+                                                    objectFit: 'cover',
+                                                    borderRadius: '4px'
+                                                }} 
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            
                             <button type="submit" className="btn btn-success" disabled={isLoading}>
                                 {isLoading ? 'Đang xử lý...' : (editingProductId ? 'Cập nhật Sản phẩm' : 'Thêm Sản phẩm')}
                             </button>
@@ -245,39 +657,65 @@ const ProductPage = () => {
             ) : (
                 <>
                     <div className="table-responsive">
-                        <table className="table table-striped table-hover">
+                        <table className="table table-striped">
                             <thead>
                                 <tr>
-                                    <th>Hình ảnh</th>
+                                    <th>Ảnh</th>
                                     <th>Tên sản phẩm</th>
                                     <th>Giá</th>
+                                    <th>Danh mục</th>
+                                    <th>Thương hiệu</th>
                                     <th>Số lượng</th>
-                                    <th>Màu sắc</th>
+                                    <th>Mã giảm giá</th>
                                     <th>Thao tác</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {currentProducts.map(product => (
-                                    <tr key={product._id}>
-                                        <td>
-                                            {product.images && product.images.length > 0 && (
-                                                <img src={product.images[0].url} alt={product.title} style={{width: '50px', height: '50px', objectFit: 'cover'}} />
-                                            )}
-                                        </td>
-                                        <td>{product.title}</td>
-                                        <td>{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(product.price)}</td>
-                                        <td>{product.quantity}</td>
-                                        <td>{product.color}</td>
-                                        <td>
-                                            <button className="btn btn-warning btn-sm me-2" onClick={() => handleEdit(product)} disabled={isLoading}>
-                                                <i className="fas fa-edit"></i> Sửa
-                                            </button>
-                                            <button className="btn btn-danger btn-sm" onClick={() => handleDelete(product._id)} disabled={isLoading}>
-                                                <i className="fas fa-trash"></i> Xóa
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
+                                {currentProducts.map(product => {
+                                    const categoryName = categories.find(c => c._id === product.category)?.title || 'Không xác định';
+                                    const brandName = brands.find(b => b._id === product.brand)?.title || 'Không xác định';
+                                    
+                                    return (
+                                        <tr key={product._id}>
+                                            <td>
+                                                <img 
+                                                    src={product.images?.[0]?.url || 'https://via.placeholder.com/50'} 
+                                                    alt={product.title} 
+                                                    className="img-thumbnail"
+                                                    style={{ width: '50px', height: '50px', objectFit: 'cover' }}
+                                                />
+                                            </td>
+                                            <td>{product.title}</td>
+                                            <td>{product.price?.toLocaleString()} VNĐ</td>
+                                            <td>{categoryName}</td>
+                                            <td>{brandName}</td>
+                                            <td>{product.quantity}</td>
+                                            <td>{displayCoupon(product)}</td>
+                                            <td>
+                                                <div className="btn-group">
+                                                    <button
+                                                        className="btn btn-warning btn-sm me-2"
+                                                        onClick={() => handleEdit(product)}
+                                                    >
+                                                        Sửa
+                                                    </button>
+                                                    <button
+                                                        className="btn btn-danger btn-sm me-2"
+                                                        onClick={() => handleDelete(product._id)}
+                                                    >
+                                                        Xóa
+                                                    </button>
+                                                    <button
+                                                        className="btn btn-info btn-sm"
+                                                        onClick={() => openCouponModal(product)}
+                                                    >
+                                                        Mã giảm giá
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>
@@ -310,6 +748,63 @@ const ProductPage = () => {
                         </button>
                     </div>
                 </>
+            )}
+
+            {/* Modal áp dụng mã giảm giá */}
+            {showCouponModal && (
+                <div className="modal show" style={{ display: 'block', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                    <div className="modal-dialog">
+                        <div className="modal-content">
+                            <div className="modal-header">
+                                <h5 className="modal-title">Áp dụng mã giảm giá</h5>
+                                <button type="button" className="btn-close" onClick={closeCouponModal}></button>
+                            </div>
+                            <div className="modal-body">
+                                <p><strong>Sản phẩm:</strong> {selectedProductForCoupon?.title}</p>
+                                <p><strong>Giá hiện tại:</strong> {selectedProductForCoupon?.price?.toLocaleString()} VNĐ</p>
+                                
+                                <div className="form-group mb-3">
+                                    <label htmlFor="couponSelect" className="form-label">Chọn mã giảm giá:</label>
+                                    <select 
+                                        id="couponSelect"
+                                        className="form-select"
+                                        value={selectedCouponId}
+                                        onChange={handleCouponChange}
+                                    >
+                                        <option value="">-- Không áp dụng --</option>
+                                        {coupons.map(coupon => (
+                                            <option key={coupon._id} value={coupon._id}>
+                                                {coupon.name} - Giảm {coupon.discount}% (Hết hạn: {new Date(coupon.expiry).toLocaleDateString()})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                
+                                {selectedCouponId && (
+                                    <div className="alert alert-info">
+                                        <p className="mb-0">
+                                            <strong>Giá sau khi áp dụng:</strong> {' '}
+                                            {(() => {
+                                                const coupon = coupons.find(c => c._id === selectedCouponId);
+                                                if (!coupon || !selectedProductForCoupon?.price) return 'Không xác định';
+                                                
+                                                const discountAmount = (selectedProductForCoupon.price * coupon.discount) / 100;
+                                                const finalPrice = selectedProductForCoupon.price - discountAmount;
+                                                return `${finalPrice.toLocaleString()} VNĐ (Giảm ${discountAmount.toLocaleString()} VNĐ)`;
+                                            })()}
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="modal-footer">
+                                <button type="button" className="btn btn-secondary" onClick={closeCouponModal}>Hủy</button>
+                                <button type="button" className="btn btn-primary" onClick={handleApplyCoupon}>
+                                    {selectedCouponId ? 'Áp dụng' : 'Xóa mã giảm giá'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

@@ -36,12 +36,13 @@ const OrderPage = () => {
         setLoading(true);
         try {
             const response = await getAllOrders();
-            const orderData = response.data.data;
+            const orderData = response.data?.data || [];
             setOrders(orderData);
             await fetchUserNames(orderData);
         } catch (error) {
             console.error("Lỗi khi lấy đơn hàng:", error);
             toast.error("Không thể tải danh sách đơn hàng");
+            setOrders([]);
         } finally {
             setLoading(false);
         }
@@ -105,8 +106,8 @@ const OrderPage = () => {
     };
 
     const offset = currentPage * ordersPerPage;
-    const currentOrders = orders.slice(offset, offset + ordersPerPage);
-    const pageCount = Math.ceil(orders.length / ordersPerPage);
+    const currentOrders = Array.isArray(orders) ? orders.slice(offset, offset + ordersPerPage) : [];
+    const pageCount = Math.ceil((Array.isArray(orders) ? orders.length : 0) / ordersPerPage);
 
     if (loading) {
         return (
@@ -141,56 +142,84 @@ const OrderPage = () => {
                     <tbody>
                         {currentOrders.length > 0 ? (
                             currentOrders.map(order => {
-                                const totalAmount = order.products.reduce((total, item) => {
-                                    return item.product ? total + item.product.price * item.quantity : total;
-                                }, 0);
-
-                                return (
-                                    <tr key={order._id}>
-                                        <td>{order._id.slice(-8)}</td>
-                                        <td>{userNames[order.user?._id] || "Không có tên"}</td>
-                                        <td>{order.user?.email || 'Không có email'}</td>
-                                        <td>
-                                            {order.shippingInfo?.address}, {order.shippingInfo?.city}
-                                        </td>
-                                        <td>{totalAmount.toLocaleString()} VNĐ</td>
-                                        <td>
-                                            <span className={`badge ${getStatusClass(order.orderStatus)}`}>
-                                                {order.orderStatus}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <button 
-                                                className="btn btn-info btn-sm me-2" 
-                                                onClick={() => handleStatusChange(order._id, 'Đang xử lý')} 
-                                                disabled={order.orderStatus === 'Đang xử lý' || processingOrder === order._id}
-                                            >
-                                                Xử lý
-                                            </button>
-                                            <button 
-                                                className="btn btn-warning btn-sm me-2" 
-                                                onClick={() => handleStatusChange(order._id, 'Đang giao hàng')} 
-                                                disabled={order.orderStatus === 'Đang giao hàng' || processingOrder === order._id}
-                                            >
-                                                Giao hàng
-                                            </button>
-                                            <button 
-                                                className="btn btn-success btn-sm me-2" 
-                                                onClick={() => handleStatusChange(order._id, 'Đã giao hàng')} 
-                                                disabled={order.orderStatus === 'Đã giao hàng' || processingOrder === order._id}
-                                            >
-                                                Hoàn thành
-                                            </button>
-                                            <button 
-                                                className="btn btn-danger btn-sm" 
-                                                onClick={() => handleStatusChange(order._id, 'Đã hủy')} 
-                                                disabled={order.orderStatus === 'Đã hủy' || processingOrder === order._id}
-                                            >
-                                                Hủy
-                                            </button>
-                                        </td>
-                                    </tr>
-                                );
+                                try {
+                                    const totalAmount = order.products.reduce((total, item) => {
+                                        return item.product ? total + item.product.price * item.quantity : total;
+                                    }, 0);
+    
+                                    return (
+                                        <tr key={order._id}>
+                                            <td>{order._id.slice(-8)}</td>
+                                            <td>{userNames[order.user?._id] || "Không có tên"}</td>
+                                            <td>{order.user?.email || 'Không có email'}</td>
+                                            <td>
+                                                {order.shippingInfo?.address}, {order.shippingInfo?.city}
+                                            </td>
+                                            <td>{totalAmount.toLocaleString()} VNĐ</td>
+                                            <td>
+                                                <span className={`badge ${getStatusClass(order.orderStatus)}`}>
+                                                    {order.orderStatus}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <button 
+                                                    className="btn btn-info btn-sm me-2" 
+                                                    onClick={() => handleStatusChange(order._id, 'Đang xử lý')} 
+                                                    disabled={order.orderStatus === 'Đang xử lý' || processingOrder === order._id}
+                                                >
+                                                    Xử lý
+                                                </button>
+                                                <button 
+                                                    className="btn btn-warning btn-sm me-2" 
+                                                    onClick={() => handleStatusChange(order._id, 'Đang giao hàng')} 
+                                                    disabled={order.orderStatus === 'Đang giao hàng' || processingOrder === order._id}
+                                                >
+                                                    Giao hàng
+                                                </button>
+                                                <button 
+                                                    className="btn btn-success btn-sm me-2" 
+                                                    onClick={() => handleStatusChange(order._id, 'Đã giao hàng')} 
+                                                    disabled={order.orderStatus === 'Đã giao hàng' || processingOrder === order._id}
+                                                >
+                                                    Hoàn thành
+                                                </button>
+                                                <button 
+                                                    className="btn btn-danger btn-sm" 
+                                                    onClick={() => handleStatusChange(order._id, 'Đã hủy')} 
+                                                    disabled={order.orderStatus === 'Đã hủy' || processingOrder === order._id}
+                                                >
+                                                    Hủy
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                } catch (error) {
+                                    console.error("Lỗi khi hiển thị đơn hàng:", error, order);
+                                    return (
+                                        <tr key={order._id || Math.random().toString()}>
+                                            <td>{order._id ? order._id.slice(-8) : 'N/A'}</td>
+                                            <td>{userNames[order.user?._id] || "Không có tên"}</td>
+                                            <td>{order.user?.email || 'Không có email'}</td>
+                                            <td>
+                                                {order.shippingInfo?.address}, {order.shippingInfo?.city}
+                                            </td>
+                                            <td>Không rõ (Lỗi dữ liệu)</td>
+                                            <td>
+                                                <span className={`badge ${getStatusClass(order.orderStatus)}`}>
+                                                    {order.orderStatus || 'Không rõ'}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <button 
+                                                    className="btn btn-danger btn-sm" 
+                                                    disabled={true}
+                                                >
+                                                    Lỗi dữ liệu
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                }
                             })
                         ) : (
                             <tr>

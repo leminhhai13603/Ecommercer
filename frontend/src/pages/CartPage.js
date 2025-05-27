@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { getCart, updateCartItem, removeFromCart } from '../api';
+import { getCart, updateCartItem, removeFromCart, getAllProducts } from '../api';
 import { toast } from 'react-toastify'; 
 import 'react-toastify/dist/ReactToastify.css';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import { FaArrowLeft, FaArrowRight, FaShoppingCart } from 'react-icons/fa';
 
 const CartPage = () => {
     const [cartItems, setCartItems] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [recommendedProducts, setRecommendedProducts] = useState([]);
+    const [currentSlide, setCurrentSlide] = useState(0);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -23,33 +26,28 @@ const CartPage = () => {
                 }
 
                 const response = await getCart();
-                // Xử lý response khi giỏ hàng trống hoặc có sản phẩm
                 if (response && response.data) {
-                    // Nếu response.data là null hoặc undefined, set mảng rỗng
                     if (!response.data) {
                         setCartItems([]);
                         return;
                     }
-                    
-                    // Nếu response.data là mảng rỗng
+
                     if (Array.isArray(response.data) && response.data.length === 0) {
                         setCartItems([]);
                         return;
+
                     }
 
-                    // Nếu response.data có items property
                     if (response.data.items) {
                         setCartItems(response.data.items);
                         return;
                     }
 
-                    // Nếu response.data là mảng các items
                     if (Array.isArray(response.data)) {
                         setCartItems(response.data);
                         return;
                     }
 
-                    // Trường hợp còn lại, set mảng rỗng
                     setCartItems([]);
                 } else {
                     setCartItems([]);
@@ -69,6 +67,39 @@ const CartPage = () => {
 
         fetchCart();
     }, [navigate]);
+
+    // Lấy sản phẩm gợi ý dựa trên danh mục của các sản phẩm trong giỏ hàng
+    useEffect(() => {
+        const fetchRecommendedProducts = async () => {
+            if (cartItems.length === 0) return;
+
+            try {
+                // Lấy các danh mục từ sản phẩm trong giỏ hàng
+                const categoryIds = [...new Set(cartItems.map(item => item.product.category))];
+                
+                // Lấy tất cả sản phẩm
+                const response = await getAllProducts();
+                if (!response.data || !response.data.data) return;
+                
+                const allProducts = response.data.data;
+                
+                // Lọc ra các sản phẩm cùng danh mục nhưng không có trong giỏ hàng
+                const cartProductIds = cartItems.map(item => item.product._id);
+                
+                const filteredProducts = allProducts.filter(product => 
+                    categoryIds.includes(product.category) && !cartProductIds.includes(product._id)
+                );
+                
+                // Lấy ngẫu nhiên 5 sản phẩm từ danh sách đã lọc
+                const shuffled = filteredProducts.sort(() => 0.5 - Math.random());
+                setRecommendedProducts(shuffled.slice(0, 5));
+            } catch (error) {
+                console.error('Lỗi khi lấy sản phẩm gợi ý:', error);
+            }
+        };
+
+        fetchRecommendedProducts();
+    }, [cartItems]);
 
     const handleUpdateQuantity = async (productId, color, newQuantity) => {
         try {
@@ -112,6 +143,36 @@ const CartPage = () => {
             return;
         }
         navigate('/checkout');
+    };
+
+    // Logic điều khiển slider
+    const nextSlide = () => {
+        setCurrentSlide(current => 
+            current === Math.ceil(recommendedProducts.length / 4) - 1 ? 0 : current + 1
+        );
+    };
+
+    const prevSlide = () => {
+        setCurrentSlide(current => 
+            current === 0 ? Math.ceil(recommendedProducts.length / 4) - 1 : current - 1
+        );
+    };
+
+    // Hàm để lấy số lượng màu sắc của sản phẩm
+    const getColorCount = (product) => {
+        if (product.color && typeof product.color === 'string') {
+            const colorArray = product.color.split(',').map(color => color.trim()).filter(Boolean);
+            return colorArray.length || 1;
+        }
+        return 1;
+    };
+
+    // Hàm để lấy số lượng kích thước của sản phẩm
+    const getSizeCount = (product) => {
+        if (product.size && Array.isArray(product.size)) {
+            return product.size.length;
+        }
+        return 1;
     };
 
     if (loading) {
@@ -168,14 +229,12 @@ const CartPage = () => {
                                     <tr key={`${item.product._id}-${item.color}`}>
                                         <td className="align-middle">
                                             <div className="d-flex align-items-center">
-                                                {item.product.image && (
-                                                    <img 
-                                                        src={item.product.image.url} 
-                                                        alt={item.product.title} 
-                                                        className="me-3"
-                                                        style={{ width: '50px', height: '50px', objectFit: 'cover' }}
-                                                    />
-                                                )}
+                                                <img 
+                                                    src={item.product.image.url || '/placeholder.jpg'} 
+                                                    alt={item.product.title} 
+                                                    className="me-3"
+                                                    style={{ width: '50px', height: '50px', objectFit: 'cover' }}
+                                                />
                                                 <div>
                                                     <h6 className="mb-0">{item.product.title}</h6>
                                                     {item.color && <small className="text-muted">Màu: {item.color}</small>}
@@ -239,7 +298,7 @@ const CartPage = () => {
                             <div className="d-grid gap-2 d-md-flex justify-content-md-end mt-3">
                                 <button 
                                     className="btn btn-outline-primary me-md-2"
-                                    onClick={() => navigate('/products')}
+                                    onClick={() => navigate('/')}
                                 >
                                     Tiếp tục mua sắm
                                 </button>
@@ -254,6 +313,78 @@ const CartPage = () => {
                     </div>
                 </>
             )}
+
+            {/* Phần Có thể bạn sẽ thích */}
+            <div className="mt-5">
+                <h3 className="mb-4">Có thể bạn sẽ thích</h3>
+                
+                <div className="position-relative">
+                    {recommendedProducts.length > 4 && (
+                        <button 
+                            className="btn btn-light position-absolute top-50 start-0 translate-middle-y rounded-circle" 
+                            style={{ zIndex: 1 }}
+                            onClick={prevSlide}
+                        >
+                            <FaArrowLeft />
+                        </button>
+                    )}
+                    
+                    <div className="row row-cols-1 row-cols-md-5 g-4">
+                        {recommendedProducts.map((product, index) => (
+                            <div 
+                                key={product._id} 
+                                className="col" 
+                                style={{ 
+                                    display: index >= currentSlide * 4 && index < (currentSlide + 1) * 4 ? 'block' : 'none'
+                                }}
+                            >
+                                <div className="card h-100 position-relative">
+                                    <Link to={`/product/${product._id}`}>
+                                        <img
+                                            src={product.images?.[0]?.url || '/placeholder.jpg'}
+                                            className="card-img-top"
+                                            alt={product.title}
+                                            style={{ width: '100%', height: '200px', objectFit: 'contain' }}
+                                        />
+                                    </Link>
+                                    <div className="card-body">
+                                        <h6 className="card-title text-truncate">{product.title}</h6>
+                                        <p className="card-text fw-bold">{product.price?.toLocaleString()} VNĐ</p>
+                                        
+                                        <div className="d-flex justify-content-between mt-2 small text-muted">
+                                            <span>+{getColorCount(product)} Màu sắc</span>
+                                            <span>+{getSizeCount(product)} Kích thước</span>
+                                        </div>
+                                    </div>
+                                    <button 
+                                        className="btn btn-sm btn-primary position-absolute bottom-0 start-50 translate-middle-x mb-2" 
+                                        style={{ width: '80%' }}
+                                        onClick={() => navigate(`/product/${product._id}`)}
+                                    >
+                                        <FaShoppingCart className="me-1" /> Thêm vào giỏ
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    
+                    {recommendedProducts.length > 4 && (
+                        <button 
+                            className="btn btn-light position-absolute top-50 end-0 translate-middle-y rounded-circle" 
+                            style={{ zIndex: 1 }}
+                            onClick={nextSlide}
+                        >
+                            <FaArrowRight />
+                        </button>
+                    )}
+                </div>
+                
+                {recommendedProducts.length === 0 && (
+                    <div className="text-center p-4 bg-light rounded">
+                        <p>Không có sản phẩm gợi ý</p>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };

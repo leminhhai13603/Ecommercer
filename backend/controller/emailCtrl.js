@@ -19,7 +19,6 @@ const sendEmail = asyncHandler(async (data) => {
 
         console.log('Đã tạo transporter');
 
-        // Kiểm tra kết nối
         await transporter.verify();
         console.log('Kết nối SMTP thành công');
 

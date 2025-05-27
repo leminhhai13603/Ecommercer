@@ -4,6 +4,8 @@ import { toast } from 'react-toastify';
 import { AuthContext } from '../contexts/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
 import ReactPaginate from 'react-paginate';
+import { FaPlus, FaMinus, FaEye, FaShoppingCart, FaPalette, FaRulerHorizontal } from 'react-icons/fa';
+import QuickViewModal from '../components/QuickViewModal';
 
 const Home = () => {
     const { isAuthenticated } = useContext(AuthContext);
@@ -16,8 +18,24 @@ const Home = () => {
     const [sortBy, setSortBy] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('');
     const [brandFilter, setBrandFilter] = useState('');
+    const [sizeFilter, setSizeFilter] = useState('');
+    const [genderFilter, setGenderFilter] = useState('');
     const [currentPage, setCurrentPage] = useState(0);
-    const [productsPerPage] = useState(4);
+    const [productsPerPage] = useState(8);
+    const [selectedProduct, setSelectedProduct] = useState(null);
+    const [showQuickView, setShowQuickView] = useState(false);
+
+    // State để theo dõi các mục đã mở/đóng
+    const [expandedSections, setExpandedSections] = useState({
+        categories: true,
+        brands: true,
+        sizes: true,
+        gender: true
+    });
+
+    // Các lựa chọn size và gender có sẵn
+    const sizeOptions = ['Free Size', 'S', 'M', 'L', 'XL', 'XXL'];
+    const genderOptions = ['Unisex', 'Nam', 'Nữ'];
 
     useEffect(() => {
         if (!isAuthenticated) {
@@ -59,21 +77,31 @@ const Home = () => {
         setBrandFilter(prev => prev === brandId ? '' : brandId);
     };
 
+    const handleSizeClick = (size) => {
+        setSizeFilter(prev => prev === size ? '' : size);
+    };
+
+    const handleGenderClick = (gender) => {
+        setGenderFilter(prev => prev === gender ? '' : gender);
+    };
+
     const handlePageClick = (event) => setCurrentPage(event.selected);
+    
+    // Xử lý đóng/mở một mục lọc
+    const toggleSection = (section) => {
+        setExpandedSections(prev => ({
+            ...prev,
+            [section]: !prev[section]
+        }));
+    };
 
-    const addToCart = async (product) => {
-        if (product.quantity <= 0) {
-            toast.error('Sản phẩm đã hết hàng!');
-            return;
-        }
+    const openQuickView = (product) => {
+        setSelectedProduct(product);
+        setShowQuickView(true);
+    };
 
-        try {
-            await apiAddToCart(product._id, 1, product.color || 'default');
-            toast.success('Đã thêm sản phẩm vào giỏ hàng!');
-        } catch (error) {
-            console.error('Error adding to cart:', error);
-            toast.error('Không thể thêm sản phẩm vào giỏ hàng. Vui lòng thử lại.');
-        }
+    const closeQuickView = () => {
+        setShowQuickView(false);
     };
 
     const filteredAndSortedProducts = React.useMemo(() => {
@@ -87,12 +115,18 @@ const Home = () => {
             .filter((product) =>
                 brandFilter ? product.brand === brandFilter : true
             )
+            .filter((product) =>
+                sizeFilter ? (product.size === sizeFilter || (!product.size && sizeFilter === 'Free Size')) : true
+            )
+            .filter((product) =>
+                genderFilter ? (product.gender === genderFilter || (!product.gender && genderFilter === 'Unisex')) : true
+            )
             .sort((a, b) => {
                 if (sortBy === 'price-asc') return a.price - b.price;
                 if (sortBy === 'price-desc') return b.price - a.price;
                 return 0;
             });
-    }, [products, searchTerm, categoryFilter, brandFilter, sortBy]);
+    }, [products, searchTerm, categoryFilter, brandFilter, sizeFilter, genderFilter, sortBy]);
 
     const offset = currentPage * productsPerPage;
     const currentProducts = filteredAndSortedProducts.slice(
@@ -100,6 +134,74 @@ const Home = () => {
         offset + productsPerPage
     );
     const pageCount = Math.ceil(filteredAndSortedProducts.length / productsPerPage);
+
+    // Hàm để lấy số lượng màu sắc của sản phẩm
+    const getColorCount = (product) => {
+        // Trường hợp 1: Sản phẩm có mảng colors
+        if (product.colors && Array.isArray(product.colors) && product.colors.length > 0) {
+            return product.colors.length;
+        }
+        
+        // Trường hợp 2: Sản phẩm có chuỗi color ngăn cách bởi dấu phẩy
+        if (product.color && typeof product.color === 'string') {
+            const colorArray = product.color.split(',').map(color => color.trim()).filter(Boolean);
+            return colorArray.length || 1;
+        }
+        
+        // Trường hợp 3: Kiểm tra variants
+        if (product.variants && Array.isArray(product.variants)) {
+            const uniqueColors = new Set();
+            product.variants.forEach(variant => {
+                if (variant.color) {
+                    uniqueColors.add(variant.color);
+                }
+            });
+            if (uniqueColors.size > 0) {
+                return uniqueColors.size;
+            }
+        }
+        
+        // Mặc định trả về 1 nếu không tìm thấy thông tin
+        return 1;
+    };
+
+    const getSizeCount = (product) => {
+        if (product.size && Array.isArray(product.size) && product.size.length > 0) {
+            return product.size.length;
+        }
+        
+        if (product.sizes && Array.isArray(product.sizes) && product.sizes.length > 0) {
+            return product.sizes.length;
+        }
+
+        if (product.variants && Array.isArray(product.variants)) {
+            const uniqueSizes = new Set();
+            product.variants.forEach(variant => {
+                if (variant.size) {
+                    uniqueSizes.add(variant.size);
+                }
+            });
+            if (uniqueSizes.size > 0) {
+                return uniqueSizes.size;
+            }
+        }
+
+        if (product.size && typeof product.size === 'string') {
+            const sizeArray = product.size.split(',').map(size => size.trim()).filter(Boolean);
+            return sizeArray.length || 1;
+        }
+        return 1;
+    };
+
+    const calculateDiscountedPrice = (product) => {
+        if (product.coupon) {
+            const discount = product.couponInfo?.discount || 0;
+            const price = product.price || 0;
+            const discountedPrice = price - (price * (discount / 100));
+            return discountedPrice;
+        }
+        return product.price || 0;
+    };
 
     if (loading) {
         return (
@@ -112,41 +214,113 @@ const Home = () => {
     }
 
     return (
-        <div className="container mt-5" style={{ minWidth: '1200px' }}>
+        <div className="container-fluid mt-5">
             <div className="row">
                 {/* Sidebar */}
                 <div className="col-md-3">
-                    <h5>Danh mục</h5>
-                    <ul className="list-group mb-4">
-                        {categories.map((category) => (
-                            <li 
-                                key={category._id} 
-                                className={`list-group-item ${categoryFilter === category._id ? 'active' : ''}`} 
-                                onClick={() => handleCategoryClick(category._id)}
-                                style={{ cursor: 'pointer' }}
-                            >
-                                {category.title}
-                            </li>
-                        ))}
-                    </ul>
+                    <div className="mb-4">
+                        <div 
+                            className="d-flex justify-content-between align-items-center mb-2" 
+                            style={{ cursor: 'pointer' }}
+                            onClick={() => toggleSection('categories')}
+                        >
+                            <h5 className="mb-0">Danh mục sản phẩm</h5>
+                            {expandedSections.categories ? <FaMinus /> : <FaPlus />}
+                        </div>
+                        {expandedSections.categories && (
+                            <ul className="list-group">
+                                {categories.map((category) => (
+                                    <li 
+                                        key={category._id} 
+                                        className={`list-group-item ${categoryFilter === category._id ? 'active' : ''}`} 
+                                        onClick={() => handleCategoryClick(category._id)}
+                                        style={{ cursor: 'pointer' }}
+                                    >
+                                        {category.title}
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
 
-                    <h5>Thương hiệu</h5>
-                    <ul className="list-group">
-                        {brands.map((brand) => (
-                            <li 
-                                key={brand._id} 
-                                className={`list-group-item ${brandFilter === brand._id ? 'active' : ''}`} 
-                                onClick={() => handleBrandClick(brand._id)}
-                                style={{ cursor: 'pointer' }}
-                            >
-                                {brand.title}
-                            </li>
-                        ))}
-                    </ul>
+                    <div className="mb-4">
+                        <div 
+                            className="d-flex justify-content-between align-items-center mb-2" 
+                            style={{ cursor: 'pointer' }}
+                            onClick={() => toggleSection('brands')}
+                        >
+                            <h5 className="mb-0">Thương hiệu</h5>
+                            {expandedSections.brands ? <FaMinus /> : <FaPlus />}
+                        </div>
+                        {expandedSections.brands && (
+                            <ul className="list-group">
+                                {brands.map((brand) => (
+                                    <li 
+                                        key={brand._id} 
+                                        className={`list-group-item ${brandFilter === brand._id ? 'active' : ''}`} 
+                                        onClick={() => handleBrandClick(brand._id)}
+                                        style={{ cursor: 'pointer' }}
+                                    >
+                                        {brand.title}
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                    
+                    <div className="mb-4">
+                        <div 
+                            className="d-flex justify-content-between align-items-center mb-2" 
+                            style={{ cursor: 'pointer' }}
+                            onClick={() => toggleSection('sizes')}
+                        >
+                            <h5 className="mb-0">Size</h5>
+                            {expandedSections.sizes ? <FaMinus /> : <FaPlus />}
+                        </div>
+                        {expandedSections.sizes && (
+                            <ul className="list-group">
+                                {sizeOptions.map((size) => (
+                                    <li 
+                                        key={size} 
+                                        className={`list-group-item ${sizeFilter === size ? 'active' : ''}`} 
+                                        onClick={() => handleSizeClick(size)}
+                                        style={{ cursor: 'pointer' }}
+                                    >
+                                        {size}
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                    
+                    <div className="mb-4">
+                        <div 
+                            className="d-flex justify-content-between align-items-center mb-2" 
+                            style={{ cursor: 'pointer' }}
+                            onClick={() => toggleSection('gender')}
+                        >
+                            <h5 className="mb-0">Giới tính</h5>
+                            {expandedSections.gender ? <FaMinus /> : <FaPlus />}
+                        </div>
+                        {expandedSections.gender && (
+                            <ul className="list-group">
+                                {genderOptions.map((gender) => (
+                                    <li 
+                                        key={gender} 
+                                        className={`list-group-item ${genderFilter === gender ? 'active' : ''}`} 
+                                        onClick={() => handleGenderClick(gender)}
+                                        style={{ cursor: 'pointer' }}
+                                    >
+                                        {gender}
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
                 </div>
 
                 {/* Product List */}
-                <div className="col-md-9" style={{ minWidth: '800px' }}>
+                <div className="col-md-9">
                     <div className="row mb-4">
                         <div className="col-md-6">
                             <input
@@ -169,7 +343,13 @@ const Home = () => {
                         {currentProducts.length > 0 ? (
                             currentProducts.map((product) => (
                                 <div key={product._id} className="col">
-                                    <div className="card h-100">
+                                    <div className="card h-100 position-relative">
+                                        {/* Thêm nhãn giảm giá */}
+                                        {product.coupon && (
+                                            <div className="discount-label">
+                                                -{product.couponInfo?.discount || 0}%
+                                            </div>
+                                        )}
                                         <Link to={`/product/${product._id}`}>
                                             <img
                                                 src={
@@ -183,18 +363,52 @@ const Home = () => {
                                         </Link>
                                         <div className="card-body">
                                             <h5 className="card-title">{product.title || 'No title'}</h5>
-                                            <p className="card-text">
-                                                {product.description?.substring(0, 50) || 'Không có mô tả'}...
-                                            </p>
-                                            <div className="d-flex justify-content-between align-items-center">
-                                                <span>{product.price?.toLocaleString()} VNĐ</span>
+                                            <div className="price-container mb-2">
+                                                {product.coupon ? (
+                                                    <>
+                                                        <div className="d-flex align-items-center gap-2">
+                                                            <span className="text-muted text-decoration-line-through">
+                                                                {product.price?.toLocaleString()} VNĐ
+                                                            </span>
+                                                            <span className="fw-bold text-danger">
+                                                                {calculateDiscountedPrice(product).toLocaleString()} VNĐ
+                                                            </span>
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    <span className="fw-bold">{product.price?.toLocaleString()} VNĐ</span>
+                                                )}
                                             </div>
+                                            
+                                            {/* Thêm thông tin về màu sắc và kích thước */}
+                                            <div className="mt-2 d-flex justify-content-between product-options">
+                                                <span className="small text-muted">
+                                                    <FaPalette className="me-1" /> 
+                                                    +{getColorCount(product)} Màu sắc
+                                                </span>
+                                                <span className="small text-muted">
+                                                    <FaRulerHorizontal className="me-1" />
+                                                    +{getSizeCount(product)} Kích thước
+                                                </span>
+                                            </div>
+                                            
+                                            {/* Di chuyển nút vào trong card-body */}
                                             <button 
-                                                className="btn btn-primary btn-sm w-100 mt-2" 
-                                                onClick={() => addToCart(product)}
+                                                className="add-to-cart-btn" 
+                                                onClick={() => openQuickView(product)}
                                                 disabled={product.quantity <= 0}
                                             >
+                                                <FaShoppingCart className="me-2" />
                                                 {product.quantity > 0 ? 'Thêm vào giỏ hàng' : 'Hết hàng'}
+                                            </button>
+                                        </div>
+                                        <div className="product-action-buttons">
+                                            <button 
+                                                className="product-action-btn" 
+                                                onClick={() => openQuickView(product)}
+                                                title="Xem nhanh"
+                                            >
+                                                <FaEye />
                                             </button>
                                         </div>
                                     </div>
@@ -202,22 +416,43 @@ const Home = () => {
                             ))
                         ) : (
                             <div className="col-12 text-center">
-                                <h4>Không có sản phẩm nào được tìm thấy.</h4>
+                                <p>Không tìm thấy sản phẩm nào phù hợp.</p>
                             </div>
                         )}
                     </div>
-                    <ReactPaginate
-                        previousLabel={<span className="btn btn-outline-primary">← Trước</span>}
-                        nextLabel={<span className="btn btn-outline-primary">Sau →</span>}
-                        pageCount={pageCount}
-                        onPageChange={handlePageClick}
-                        containerClassName={'pagination justify-content-center mt-4'}
-                        pageClassName={'page-item'}
-                        pageLinkClassName={'page-link'}
-                        activeClassName={'active'}
-                    />
+
+                    {pageCount > 1 && (
+                        <div className="mt-4 d-flex justify-content-center">
+                            <ReactPaginate
+                                previousLabel={'Trước'}
+                                nextLabel={'Sau'}
+                                breakLabel={'...'}
+                                pageCount={pageCount}
+                                marginPagesDisplayed={2}
+                                pageRangeDisplayed={5}
+                                onPageChange={handlePageClick}
+                                containerClassName={'pagination'}
+                                pageClassName={'page-item'}
+                                pageLinkClassName={'page-link'}
+                                previousClassName={'page-item'}
+                                previousLinkClassName={'page-link'}
+                                nextClassName={'page-item'}
+                                nextLinkClassName={'page-link'}
+                                breakClassName={'page-item'}
+                                breakLinkClassName={'page-link'}
+                                activeClassName={'active'}
+                            />
+                        </div>
+                    )}
                 </div>
             </div>
+
+            {/* Hiển thị Modal xem nhanh sản phẩm */}
+            <QuickViewModal 
+                show={showQuickView} 
+                onClose={closeQuickView} 
+                product={selectedProduct}
+            />
         </div>
     );
 };

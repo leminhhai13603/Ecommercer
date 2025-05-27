@@ -1,5 +1,6 @@
 const Product = require('../models/productModel');
 const User = require('../models/userModel');
+const Coupon = require('../models/couponModel');
 const asyncHandler = require('express-async-handler');
 const validateMongoDbId = require('../utils/validateMongodbid');
 const slugify = require('slugify');
@@ -13,10 +14,35 @@ const createProduct = asyncHandler(async (req, res) => {
         if (existingProduct) {
             return res.status(400).json({ message: "Slug đã tồn tại. Vui lòng chọn một tiêu đề khác." });
         }
+        
+        // Xử lý size - hỗ trợ cả mảng và chuỗi
+        if (Array.isArray(req.body.size) && req.body.size.length > 0) {
+            // Nếu chỉ có một size, lưu dưới dạng chuỗi
+            if (req.body.size.length === 1) {
+                req.body.size = req.body.size[0];
+            } 
+            // Nếu có nhiều size, đảm bảo rằng tất cả đều nằm trong enum cho phép
+            else {
+                const validSizes = ['S', 'M', 'L', 'XL', 'XXL', 'Free Size'];
+                const allSizesValid = req.body.size.every(size => validSizes.includes(size));
+                if (!allSizesValid) {
+                    return res.status(400).json({ 
+                        message: "Giá trị size không hợp lệ. Các size hợp lệ là: S, M, L, XL, XXL, Free Size" 
+                    });
+                }
+            }
+        }
+        
+        // Xử lý màu sắc - chuyển thành chuỗi nếu là mảng
+        if (Array.isArray(req.body.color)) {
+            req.body.color = req.body.color.join(', ');
+        }
+        
         req.body.slug = slug;
         const newProduct = await Product.create(req.body);
         res.status(201).json(newProduct);
     } catch (error) {
+        console.error("Lỗi khi tạo sản phẩm:", error);
         res.status(500).json({ 
             message: "Có lỗi xảy ra khi tạo sản phẩm.",
             error: process.env.NODE_ENV === 'development' ? error.message : undefined
@@ -43,7 +69,6 @@ const getProduct = asyncHandler(async (req, res) => {
 
 const getAllProduct = asyncHandler(async (req, res) => {
     try {
-        // Xây dựng query string
         let queryStr = JSON.stringify(req.query);
         queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, match => `$${match}`);
         let query = JSON.parse(queryStr);
@@ -56,15 +81,12 @@ const getAllProduct = asyncHandler(async (req, res) => {
             }
         });
 
-        // Xử lý lọc theo giá
         if (query.price) {
             query.price = JSON.parse(query.price.replace(/\b(gte|gt|lte|lt)\b/g, match => `$${match}`));
         }
 
-        // Tạo đối tượng truy vấn
-        let productQuery = Product.find(query);
+        let productQuery = Product.find(query).populate('coupon');
 
-        // Sắp xếp
         if (req.query.sort) {
             const sortBy = req.query.sort.split(',').join(' ');
             productQuery = productQuery.sort(sortBy);
@@ -72,7 +94,6 @@ const getAllProduct = asyncHandler(async (req, res) => {
             productQuery = productQuery.sort('-createdAt');
         }
 
-        // Giới hạn trường
         if (req.query.fields) {
             const fields = req.query.fields.split(',').join(' ');
             productQuery = productQuery.select(fields);
@@ -80,16 +101,32 @@ const getAllProduct = asyncHandler(async (req, res) => {
             productQuery = productQuery.select('-__v');
         }
 
-        // Phân trang
         const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 10;
-        const skip = (page - 1) * limit;
-        productQuery = productQuery.skip(skip).limit(limit);
+        const limit = req.query.limit ? parseInt(req.query.limit) : null;
+        const skip = (page - 1) * (limit || 0);
+        
+        // Chỉ áp dụng limit khi có giá trị limit được chỉ định
+        if (limit) {
+            productQuery = productQuery.skip(skip).limit(limit);
+        } else {
+            productQuery = productQuery.skip(skip);
+        }
 
-        // Thực hiện truy vấn
         const products = await productQuery;
 
-        // Đếm tổng số sản phẩm
+        // Thêm thông tin về coupon vào mỗi sản phẩm
+        const productsWithCouponInfo = products.map(product => {
+            const productObj = product.toObject();
+            if (productObj.coupon) {
+                productObj.couponInfo = {
+                    name: productObj.coupon.name,
+                    discount: productObj.coupon.discount,
+                    expiry: productObj.coupon.expiry
+                };
+            }
+            return productObj;
+        });
+
         const totalProducts = await Product.countDocuments(query);
 
         console.log('Số lượng sản phẩm tìm thấy:', products.length);
@@ -99,8 +136,8 @@ const getAllProduct = asyncHandler(async (req, res) => {
             count: products.length,
             totalProducts,
             page,
-            totalPages: Math.ceil(totalProducts / limit),
-            data: products
+            totalPages: limit ? Math.ceil(totalProducts / limit) : 1,
+            data: productsWithCouponInfo
         });
     } catch (error) {
         console.error('Lỗi khi lấy danh sách sản phẩm:', error);
@@ -115,28 +152,46 @@ const updateProduct = asyncHandler(async (req, res) => {
     const { id } = req.params;
     validateMongoDbId(id);
     try {
-        // Tạo slug mới từ tiêu đề sản phẩm nếu có
         if (req.body.title) {
             const newSlug = slugify(req.body.title, { lower: true, strict: true });
-            
-            // Kiểm tra xem slug mới đã tồn tại chưa (trừ sản phẩm hiện tại)
             const existingProduct = await Product.findOne({ slug: newSlug, _id: { $ne: id } });
             if (existingProduct) {
                 return res.status(400).json({ message: "Slug đã tồn tại. Vui lòng chọn một tiêu đề khác." });
             }
-            
-            // Thêm slug mới vào dữ liệu cập nhật
+
             req.body.slug = newSlug;
         }
         
-        // Cập nhật sản phẩm
+        // Xử lý size - hỗ trợ cả mảng và chuỗi
+        if (Array.isArray(req.body.size) && req.body.size.length > 0) {
+            // Nếu chỉ có một size, lưu dưới dạng chuỗi
+            if (req.body.size.length === 1) {
+                req.body.size = req.body.size[0];
+            } 
+            // Nếu có nhiều size, đảm bảo rằng tất cả đều nằm trong enum cho phép
+            else {
+                const validSizes = ['S', 'M', 'L', 'XL', 'XXL', 'Free Size'];
+                const allSizesValid = req.body.size.every(size => validSizes.includes(size));
+                if (!allSizesValid) {
+                    return res.status(400).json({ 
+                        message: "Giá trị size không hợp lệ. Các size hợp lệ là: S, M, L, XL, XXL, Free Size" 
+                    });
+                }
+            }
+        }
+        
+        // Xử lý màu sắc - chuyển thành chuỗi nếu là mảng
+        if (Array.isArray(req.body.color)) {
+            req.body.color = req.body.color.join(', ');
+        }
+
         const updatedProduct = await Product.findByIdAndUpdate(id, req.body, { new: true });
         if (!updatedProduct) {
             return res.status(404).json({ message: "Không tìm thấy sản phẩm" });
         }
         res.status(200).json(updatedProduct);
     } catch (error) {
-        // Xử lý lỗi chung
+        console.error("Lỗi khi cập nhật sản phẩm:", error);
         res.status(500).json({ 
             message: "Có lỗi xảy ra khi cập nhật sản phẩm.",
             error: process.env.NODE_ENV === 'development' ? error.message : undefined
@@ -218,8 +273,7 @@ const rating = asyncHandler(async (req, res) => {
                 { new: true }
             );
         }
-        
-        // Tính toán lại tổng đánh giá
+
         const updatedProduct = await Product.findById(prodId);
         const totalRating = updatedProduct.ratings.reduce((sum, item) => sum + item.star, 0);
         const ratingCount = updatedProduct.ratings.length;
@@ -252,7 +306,6 @@ const uploadImage = asyncHandler(async (req, res) => {
         const uploadPromises = req.files.map(async (file) => {
             console.log('Processing file:', file.originalname);
             try {
-                // Sử dụng buffer thay vì file path
                 const result = await cloudinaryUploadImg(file.buffer);
                 console.log('Cloudinary result:', result);
                 return {
@@ -285,7 +338,6 @@ const uploadImage = asyncHandler(async (req, res) => {
     }
 });
 
-// Thêm hàm mới để xóa ảnh
 const deleteImage = asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { public_id } = req.body;
@@ -297,10 +349,8 @@ const deleteImage = asyncHandler(async (req, res) => {
             return res.status(404).json({ message: "Không tìm thấy sản phẩm" });
         }
 
-        // Xóa ảnh trên Cloudinary
         await cloudinaryUploadImg.cloudinary.uploader.destroy(public_id);
 
-        // Xóa ảnh khỏi mảng images của sản phẩm
         product.images = product.images.filter(img => img.public_id !== public_id);
 
         await product.save();
@@ -318,6 +368,102 @@ const deleteImage = asyncHandler(async (req, res) => {
     }
 });
 
+// Áp dụng mã giảm giá cho sản phẩm
+const applyProductCoupon = asyncHandler(async (req, res) => {
+    const { productId } = req.params;
+    const { couponId } = req.body;
+    
+    try {
+        validateMongoDbId(productId);
+        validateMongoDbId(couponId);
+        
+        // Kiểm tra mã giảm giá tồn tại và chưa hết hạn
+        const coupon = await Coupon.findById(couponId);
+        if (!coupon) {
+            return res.status(404).json({ 
+                success: false,
+                message: "Không tìm thấy mã giảm giá" 
+            });
+        }
+        
+        if (new Date() > new Date(coupon.expiry)) {
+            return res.status(400).json({ 
+                success: false,
+                message: "Mã giảm giá đã hết hạn" 
+            });
+        }
+        
+        // Áp dụng cho sản phẩm
+        const product = await Product.findByIdAndUpdate(
+            productId,
+            { coupon: couponId },
+            { new: true }
+        ).populate('coupon');
+        
+        if (!product) {
+            return res.status(404).json({ 
+                success: false,
+                message: "Không tìm thấy sản phẩm" 
+            });
+        }
+        
+        res.json({
+            success: true,
+            message: "Đã áp dụng mã giảm giá cho sản phẩm",
+            product: {
+                ...product.toObject(),
+                couponInfo: {
+                    name: coupon.name,
+                    discount: coupon.discount,
+                    expiry: coupon.expiry
+                }
+            }
+        });
+    } catch (error) {
+        console.error("Lỗi khi áp dụng mã giảm giá:", error);
+        res.status(500).json({ 
+            success: false,
+            message: "Có lỗi xảy ra khi áp dụng mã giảm giá", 
+            error: error.message 
+        });
+    }
+});
+
+// Xóa mã giảm giá khỏi sản phẩm
+const removeProductCoupon = asyncHandler(async (req, res) => {
+    const { productId } = req.params;
+    
+    try {
+        validateMongoDbId(productId);
+        
+        const product = await Product.findByIdAndUpdate(
+            productId,
+            { $unset: { coupon: 1 } },
+            { new: true }
+        );
+        
+        if (!product) {
+            return res.status(404).json({ 
+                success: false,
+                message: "Không tìm thấy sản phẩm" 
+            });
+        }
+        
+        res.json({
+            success: true,
+            message: "Đã xóa mã giảm giá khỏi sản phẩm",
+            product
+        });
+    } catch (error) {
+        console.error("Lỗi khi xóa mã giảm giá:", error);
+        res.status(500).json({ 
+            success: false,
+            message: "Có lỗi xảy ra khi xóa mã giảm giá", 
+            error: error.message 
+        });
+    }
+});
+
 module.exports = {
     createProduct,
     getProduct,
@@ -327,5 +473,7 @@ module.exports = {
     addToWishlist,
     rating,
     uploadImage,
-    deleteImage  
+    deleteImage,
+    applyProductCoupon,
+    removeProductCoupon
 };

@@ -2,7 +2,6 @@ const Category = require('../models/prodCategoryModel');
 const asyncHandler = require('express-async-handler');
 const validateMongoDbId = require('../utils/validateMongodbid');
 
-// Tạo danh mục mới
 const createCategory = asyncHandler(async (req, res) => {
     try {
         const existingCategory = await Category.findOne({ title: req.body.title });
@@ -28,7 +27,6 @@ const createCategory = asyncHandler(async (req, res) => {
     }
 });
 
-// Lấy tất cả danh mục
 const getAllCategories = asyncHandler(async (req, res) => {
     try {
         const categories = await Category.find();
@@ -46,7 +44,6 @@ const getAllCategories = asyncHandler(async (req, res) => {
     }
 });
 
-// Lấy một danh mục theo ID
 const getCategory = asyncHandler(async (req, res) => {
     const { id } = req.params;
     validateMongoDbId(id);
@@ -71,7 +68,6 @@ const getCategory = asyncHandler(async (req, res) => {
     }
 });
 
-// Cập nhật danh mục
 const updateCategory = asyncHandler(async (req, res) => {
     const { id } = req.params;
     validateMongoDbId(id);
@@ -97,7 +93,6 @@ const updateCategory = asyncHandler(async (req, res) => {
     }
 });
 
-// Xóa danh mục
 const deleteCategory = asyncHandler(async (req, res) => {
     const { id } = req.params;
     validateMongoDbId(id);

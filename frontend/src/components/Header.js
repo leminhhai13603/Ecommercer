@@ -1,4 +1,4 @@
-import React, { useContext, useState, useEffect } from 'react';
+import React, { useContext, useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../contexts/AuthContext';
 import { FaShoppingCart, FaUserCircle, FaSignOutAlt, FaKey } from 'react-icons/fa';
@@ -9,8 +9,19 @@ const Header = () => {
     const location = useLocation();
     const [cartCount, setCartCount] = useState(0);
     const [dropdownOpen, setDropdownOpen] = useState(false);
+    const dropdownRef = useRef(null);
+    const prevAuthState = useRef(false);
 
     const isAdminPage = location.pathname.startsWith('/admin');
+
+    // Theo dõi thay đổi trạng thái đăng nhập để đóng dropdown
+    useEffect(() => {
+        // Nếu vừa mới đăng nhập, đảm bảo dropdown đóng
+        if (isAuthenticated && !prevAuthState.current) {
+            setDropdownOpen(false);
+        }
+        prevAuthState.current = isAuthenticated;
+    }, [isAuthenticated]);
 
     useEffect(() => {
         if (!isAdminPage) {
@@ -19,15 +30,39 @@ const Header = () => {
         }
     }, [isAdminPage]);
 
+    // Đóng dropdown khi thay đổi trang
+    useEffect(() => {
+        setDropdownOpen(false);
+    }, [location.pathname]);
+
+    // Xử lý đóng dropdown khi click ra ngoài
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setDropdownOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
+
     const handleLogout = () => {
         localStorage.removeItem('token');
         setIsAuthenticated(false);
+        setDropdownOpen(false); // Đảm bảo dropdown đóng khi đăng xuất
         navigate('/login');
     };
 
+    const toggleDropdown = () => {
+        setDropdownOpen(prevState => !prevState);
+    };
+
     return (
-        <header className="bg-light shadow-sm border-bottom">
-            <div className="container d-flex justify-content-between align-items-center py-2">
+        <header className="bg-light shadow-sm border-bottom w-100">
+            <div className="container-fluid px-3 d-flex justify-content-between align-items-center py-2">
                 {/* Logo hoặc Admin Title */}
                 <div className="d-flex align-items-center">
                     {isAdminPage ? (
@@ -36,7 +71,7 @@ const Header = () => {
                             <span className="ms-2 badge bg-primary">Admin Dashboard</span>
                         </div>
                     ) : (
-                        <Link to="/" className="text-decoration-none fw-bold fs-4 text-primary me-4">CellphoneX</Link>
+                        <Link to="/" className="text-decoration-none fw-bold fs-4 text-primary me-4">HaiFashion</Link>
                     )}
                 </div>
 
@@ -45,18 +80,20 @@ const Header = () => {
                     {isAuthenticated ? (
                         <div 
                             className="position-relative me-3" 
-                            onMouseEnter={() => setDropdownOpen(true)} 
-                            onMouseLeave={() => setDropdownOpen(false)}
+                            ref={dropdownRef}
                         >
                             <button
                                 className="btn btn-outline-secondary d-flex align-items-center"
+                                onClick={toggleDropdown}
                             >
                                 <FaUserCircle className="me-2" />
-                                {user?.fullName || 'User'}
+                                {user?.firstname && user?.lastname 
+                                    ? `${user.firstname} ${user.lastname}` 
+                                    : (user?.firstname || user?.lastname || 'User')}
                             </button>
 
                             {dropdownOpen && (
-                                <ul className="dropdown-menu show position-absolute" style={{ top: '100%', right: 0 }}>
+                                <ul className="dropdown-menu show position-absolute" style={{ top: '100%', right: 0, zIndex: 1000 }}>
                                     {!isAdminPage && (
                                         <>
                                             <li>

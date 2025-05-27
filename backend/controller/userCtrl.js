@@ -18,12 +18,10 @@ const createUser = asyncHandler(async (req, res) => {
     const findUser = await User.findOne({ email });
     
     if (!findUser) {
-        // Tạo user mới
         const newUser = await User.create(req.body);
         const token = generateToken(newUser._id);
         res.status(201).json({ newUser, token });
     } else {
-        // Người dùng đã tồn tại
         res.status(400).json({ message: 'Email đã được sử dụng' });
     }
 });
@@ -178,10 +176,9 @@ const updatePassword = asyncHandler(async (req, res) => {
         if (!(await user.isPasswordMatched(currentPassword))) {
             return res.status(400).json({ message: 'Mật khẩu hiện tại không đúng' });
         }
-        
-        // Cập nhật mật khẩu
+
         user.password = newPassword;
-        await user.save(); // Điều này sẽ kích hoạt middleware pre-save
+        await user.save(); 
         
         res.status(200).json({ message: 'Cập nhật mật khẩu thành công' });
     } catch (error) {
@@ -341,12 +338,31 @@ const getUserCart = asyncHandler(async (req, res) => {
 
 const addToCart = asyncHandler(async (req, res) => {
     const { _id } = req.user;
-    const { productId, quantity, color } = req.body;
+    const { productId, quantity, count, color, size = 'Free Size' } = req.body;
+    
+    const productQuantity = count || quantity || 1;
+    
+    if (isNaN(productQuantity) || productQuantity <= 0) {
+        return res.status(400).json({ message: 'Số lượng sản phẩm không hợp lệ' });
+    }
+    
     validateMongodbId(_id);
     try {
         const product = await Product.findById(productId);
         if (!product) {
             return res.status(404).json({ message: 'Sản phẩm không tồn tại' });
+        }
+
+        if (Array.isArray(product.size)) {
+            if (!product.size.includes(size)) {
+                return res.status(400).json({ 
+                    message: `Size ${size} không có sẵn cho sản phẩm này. Các size có sẵn: ${product.size.join(', ')}` 
+                });
+            }
+        } else if (product.size !== size && product.size !== 'Free Size') {
+            return res.status(400).json({ 
+                message: `Size ${size} không có sẵn cho sản phẩm này. Size có sẵn: ${product.size}` 
+            });
         }
 
         let cart = await Cart.findOne({ userId: _id });
@@ -355,16 +371,17 @@ const addToCart = asyncHandler(async (req, res) => {
         }
 
         const existingProductIndex = cart.products.findIndex(
-            item => item.product.toString() === productId && item.color === color
+            item => item.product.toString() === productId && item.color === color && item.size === size
         );
 
         if (existingProductIndex !== -1) {
-            cart.products[existingProductIndex].quantity += quantity;
+            cart.products[existingProductIndex].quantity += productQuantity;
         } else {
             cart.products.push({
                 product: productId,
-                quantity,
+                quantity: productQuantity,
                 color,
+                size,
                 price: product.price
             });
         }
@@ -372,7 +389,6 @@ const addToCart = asyncHandler(async (req, res) => {
         cart.cartTotal = cart.products.reduce((total, item) => total + (item.price * item.quantity), 0);
         await cart.save();
 
-        // Cập nhật giỏ hàng trong User model
         await User.findByIdAndUpdate(_id, { cart: cart.products });
 
         res.status(200).json({
@@ -387,7 +403,7 @@ const addToCart = asyncHandler(async (req, res) => {
 
 const removeFromCart = asyncHandler(async (req, res) => {
     const { _id } = req.user;
-    const { productId, color } = req.body;
+    const { productId, color, size = 'Free Size' } = req.body;
     validateMongodbId(_id);
     try {
         let cart = await Cart.findOne({ userId: _id });
@@ -396,13 +412,12 @@ const removeFromCart = asyncHandler(async (req, res) => {
         }
 
         cart.products = cart.products.filter(item => 
-            !(item.product.toString() === productId && item.color === color)
+            !(item.product.toString() === productId && item.color === color && item.size === size)
         );
 
         cart.cartTotal = cart.products.reduce((total, item) => total + (item.price * item.quantity), 0);
         await cart.save();
 
-        // Cập nhật giỏ hàng trong User model
         await User.findByIdAndUpdate(_id, { cart: cart.products });
 
         res.status(200).json({
@@ -418,7 +433,7 @@ const removeFromCart = asyncHandler(async (req, res) => {
 });
 const updateCartItem = asyncHandler(async (req, res) => {
     const { _id } = req.user;
-    const { productId, quantity } = req.body;
+    const { productId, quantity, color, size = 'Free Size' } = req.body;
     validateMongodbId(_id);
     try {
         const cart = await Cart.findOne({ userId: _id });
@@ -427,13 +442,14 @@ const updateCartItem = asyncHandler(async (req, res) => {
         }
 
         cart.products = cart.products.map(item => 
-            item.product.toString() === productId ? { ...item, quantity: quantity } : item
+            (item.product.toString() === productId && item.color === color && item.size === size) 
+                ? { ...item, quantity: quantity } 
+                : item
         );
 
         cart.cartTotal = cart.products.reduce((total, item) => total + (item.price * item.quantity), 0);
         await cart.save();
 
-        // Cập nhật giỏ hàng trong User model
         await User.findByIdAndUpdate(_id, { cart: cart.products });
 
         res.status(200).json({
@@ -546,17 +562,15 @@ const createOrder = asyncHandler(async (req, res) => {
             user: user._id,
             orderStatus: isPaid ? 'Đã thanh toán' : 'Đang xử lý',
             totalAmount: finalAmount,
-            paidAt: isPaid ? new Date() : new Date(0) // Đặt một giá trị mặc định nếu chưa thanh toán
+            paidAt: isPaid ? new Date() : new Date(0) 
         });
 
-        // Cập nhật số lượng sản phẩm và bán hàng
         for (const item of cart.products) {
             await Product.findByIdAndUpdate(item.product._id, {
                 $inc: { quantity: -item.quantity, sold: +item.quantity }
             });
         }
 
-        // Xóa giỏ hàng sau khi đặt hàng
         await Cart.findOneAndDelete({ userId: _id });
         user.cart = [];
         await user.save();
@@ -598,10 +612,8 @@ const getOrders = asyncHandler(async (req, res) => {
     validateMongodbId(_id);
     
     try {
-        // Đầu tiên lấy orders
         let orders = await Order.find({ user: _id });
-        
-        // Manually populate products
+
         orders = await Promise.all(orders.map(async (order) => {
             const populatedProducts = await Promise.all(order.products.map(async (item) => {
                 const product = await Product.findById(item.product).select('title price images');
@@ -616,7 +628,6 @@ const getOrders = asyncHandler(async (req, res) => {
             return orderObj;
         }));
 
-        // Log để debug
         console.log('Populated orders:', JSON.stringify(orders[0]?.products, null, 2));
 
         res.json(orders);
@@ -643,7 +654,6 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
             return res.status(400).json({ message: 'Trạng thái không được cung cấp' });
         }
 
-        // Kiểm tra trạng thái hợp lệ
         const validStatuses = ['Đang xử lý', 'Đang giao hàng', 'Đã giao hàng', 'Đã hủy'];
         if (!validStatuses.includes(status)) {
             return res.status(400).json({ message: 'Trạng thái không hợp lệ' });
@@ -654,7 +664,6 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
             return res.status(404).json({ message: 'Không tìm thấy đơn hàng' });
         }
 
-        // Kiểm tra logic chuyển trạng thái
         const statusFlow = {
             'Đang xử lý': ['Đang giao hàng', 'Đã hủy'],
             'Đang giao hàng': ['Đã giao hàng', 'Đã hủy'],
@@ -668,7 +677,6 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
             });
         }
 
-        // Cập nhật trạng thái
         order.orderStatus = status;
         if (status === 'Đã giao hàng') {
             order.deliveredAt = new Date();
