@@ -54,11 +54,24 @@ const getProduct = asyncHandler(async (req, res) => {
     const { id } = req.params;
     try {
         validateMongoDbId(id);
-        const product = await Product.findById(id);
+        const product = await Product.findById(id)
+            .populate({ path: 'category', model: 'ProdCategory' })
+            .populate({ path: 'brand', model: 'Brand' })
+            .populate({ path: 'coupon', model: 'Coupon' });
         if (!product) {
             return res.status(404).json({ message: "Không tìm thấy sản phẩm" });
         }
-        res.status(200).json(product);
+
+        const productObj = product.toObject();
+        if (productObj.coupon) {
+            productObj.couponInfo = {
+                name: productObj.coupon.name,
+                discount: productObj.coupon.discount,
+                expiry: productObj.coupon.expiry
+            };
+        }
+
+        res.status(200).json(productObj);
     } catch (error) {
         if (error.kind === 'ObjectId') {
             return res.status(400).json({ message: "ID sản phẩm không hợp lệ" });
@@ -85,7 +98,10 @@ const getAllProduct = asyncHandler(async (req, res) => {
             query.price = JSON.parse(query.price.replace(/\b(gte|gt|lte|lt)\b/g, match => `$${match}`));
         }
 
-        let productQuery = Product.find(query).populate('coupon');
+        let productQuery = Product.find(query)
+            .populate({ path: 'category', model: 'ProdCategory' })
+            .populate({ path: 'brand', model: 'Brand' })
+            .populate({ path: 'coupon', model: 'Coupon' });
 
         if (req.query.sort) {
             const sortBy = req.query.sort.split(',').join(' ');

@@ -167,7 +167,8 @@ Hãy trả lời với sự tự tin và chuyên nghiệp như một chuyên gia
             brandName: 1,
             categoryName: 1,
             ratings: 1,
-            totalrating: 1
+            totalrating: 1,
+            coupon: 1,
           }
         },
         { $limit: 10 }

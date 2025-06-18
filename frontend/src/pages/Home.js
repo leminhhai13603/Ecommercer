@@ -21,7 +21,7 @@ const Home = () => {
     const [sizeFilter, setSizeFilter] = useState('');
     const [genderFilter, setGenderFilter] = useState('');
     const [currentPage, setCurrentPage] = useState(0);
-    const [productsPerPage] = useState(8);
+    const [productsPerPage] = useState(12);
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [showQuickView, setShowQuickView] = useState(false);
 
@@ -36,12 +36,6 @@ const Home = () => {
     // Các lựa chọn size và gender có sẵn
     const sizeOptions = ['Free Size', 'S', 'M', 'L', 'XL', 'XXL'];
     const genderOptions = ['Unisex', 'Nam', 'Nữ'];
-
-    useEffect(() => {
-        if (!isAuthenticated) {
-            navigate('/login');
-        }
-    }, [isAuthenticated, navigate]);
 
     const fetchProducts = useCallback(async () => {
         setLoading(true);
@@ -102,6 +96,33 @@ const Home = () => {
 
     const closeQuickView = () => {
         setShowQuickView(false);
+        setSelectedProduct(null);
+    };
+
+    // Hàm kiểm tra match Category
+    const categoryMatches = (product, filterValue) => {
+        if (!filterValue) return true;
+        
+        // Nếu category là object, kiểm tra _id
+        if (product.category && typeof product.category === 'object' && product.category._id) {
+            return product.category._id === filterValue;
+        }
+        
+        // Nếu category là string, so sánh trực tiếp
+        return product.category === filterValue;
+    };
+    
+    // Hàm kiểm tra match Brand
+    const brandMatches = (product, filterValue) => {
+        if (!filterValue) return true;
+        
+        // Nếu brand là object, kiểm tra _id
+        if (product.brand && typeof product.brand === 'object' && product.brand._id) {
+            return product.brand._id === filterValue;
+        }
+        
+        // Nếu brand là string, so sánh trực tiếp
+        return product.brand === filterValue;
     };
 
     const filteredAndSortedProducts = React.useMemo(() => {
@@ -109,15 +130,41 @@ const Home = () => {
             .filter((product) =>
                 product.title?.toLowerCase().includes(searchTerm.toLowerCase())
             )
-            .filter((product) =>
-                categoryFilter ? product.category === categoryFilter : true
-            )
-            .filter((product) =>
-                brandFilter ? product.brand === brandFilter : true
-            )
-            .filter((product) =>
-                sizeFilter ? (product.size === sizeFilter || (!product.size && sizeFilter === 'Free Size')) : true
-            )
+            .filter((product) => categoryMatches(product, categoryFilter))
+            .filter((product) => brandMatches(product, brandFilter))
+            .filter((product) => {
+                if (!sizeFilter) return true;
+                
+                // Xử lý trường hợp Free Size
+                if (sizeFilter === 'Free Size') {
+                    return !product.size || product.size === 'Free Size' || 
+                           (Array.isArray(product.size) && product.size.length === 0) ||
+                           (Array.isArray(product.sizes) && product.sizes.length === 0);
+                }
+
+                // Kiểm tra size trong mảng sizes
+                if (Array.isArray(product.sizes)) {
+                    return product.sizes.includes(sizeFilter);
+                }
+
+                // Kiểm tra size trong mảng size
+                if (Array.isArray(product.size)) {
+                    return product.size.includes(sizeFilter);
+                }
+
+                // Kiểm tra size là chuỗi (có thể chứa nhiều size ngăn cách bằng dấu phẩy)
+                if (typeof product.size === 'string') {
+                    const sizes = product.size.split(',').map(s => s.trim());
+                    return sizes.includes(sizeFilter);
+                }
+
+                // Kiểm tra trong variants nếu có
+                if (Array.isArray(product.variants)) {
+                    return product.variants.some(variant => variant.size === sizeFilter);
+                }
+
+                return false;
+            })
             .filter((product) =>
                 genderFilter ? (product.gender === genderFilter || (!product.gender && genderFilter === 'Unisex')) : true
             )
@@ -203,6 +250,22 @@ const Home = () => {
         return product.price || 0;
     };
 
+    // Thêm hàm kiểm tra đăng nhập trước khi thêm vào giỏ hàng
+    const handleAddToCart = async (productId, quantity = 1) => {
+        if (!isAuthenticated) {
+            toast.warn('Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng!');
+            navigate('/login');
+            return;
+        }
+        
+        try {
+            await apiAddToCart({ productId, quantity });
+            toast.success('Đã thêm sản phẩm vào giỏ hàng!');
+        } catch (error) {
+            toast.error('Không thể thêm vào giỏ hàng. Vui lòng thử lại sau.');
+        }
+    };
+
     if (loading) {
         return (
             <div className="text-center mt-5">
@@ -214,10 +277,10 @@ const Home = () => {
     }
 
     return (
-        <div className="container-fluid mt-5">
+        <div className="container-fluid py-5 mt-4">
             <div className="row">
                 {/* Sidebar */}
-                <div className="col-md-3">
+                <div className="col-lg-3 col-md-4 mb-4">
                     <div className="mb-4">
                         <div 
                             className="d-flex justify-content-between align-items-center mb-2" 
@@ -319,8 +382,9 @@ const Home = () => {
                     </div>
                 </div>
 
-                {/* Product List */}
-                <div className="col-md-9">
+                {/* Main content */}
+                <div className="col-lg-9 col-md-8">
+                    {/* Search and Sort Controls */}
                     <div className="row mb-4">
                         <div className="col-md-6">
                             <input
@@ -339,7 +403,9 @@ const Home = () => {
                             </select>
                         </div>
                     </div>
-                    <div className="row row-cols-1 row-cols-md-4 g-4">
+
+                    {/* Product Grid */}
+                    <div className="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-4">
                         {currentProducts.length > 0 ? (
                             currentProducts.map((product) => (
                                 <div key={product._id} className="col">
@@ -421,17 +487,18 @@ const Home = () => {
                         )}
                     </div>
 
+                    {/* Pagination */}
                     {pageCount > 1 && (
-                        <div className="mt-4 d-flex justify-content-center">
+                        <div className="d-flex justify-content-center mt-4">
                             <ReactPaginate
-                                previousLabel={'Trước'}
-                                nextLabel={'Sau'}
-                                breakLabel={'...'}
+                                previousLabel={<span>&laquo; Trước</span>}
+                                nextLabel={<span>Sau &raquo;</span>}
+                                breakLabel={<span>...</span>}
                                 pageCount={pageCount}
                                 marginPagesDisplayed={2}
                                 pageRangeDisplayed={5}
                                 onPageChange={handlePageClick}
-                                containerClassName={'pagination'}
+                                containerClassName={'custom-pagination'}
                                 pageClassName={'page-item'}
                                 pageLinkClassName={'page-link'}
                                 previousClassName={'page-item'}
@@ -447,12 +514,107 @@ const Home = () => {
                 </div>
             </div>
 
-            {/* Hiển thị Modal xem nhanh sản phẩm */}
+            {/* Quick View Modal */}
             <QuickViewModal 
-                show={showQuickView} 
-                onClose={closeQuickView} 
+                show={showQuickView}
+                onClose={closeQuickView}
                 product={selectedProduct}
             />
+
+            <style jsx>{`
+                .custom-pagination {
+                    display: flex;
+                    justify-content: center;
+                    list-style: none;
+                    padding: 0;
+                    margin: 20px 0;
+                }
+
+                .custom-pagination .page-item {
+                    margin: 0 5px;
+                }
+
+                .custom-pagination .page-link {
+                    color: #333;
+                    padding: 8px 16px;
+                    text-decoration: none;
+                    border: 1px solid #ddd;
+                    border-radius: 4px;
+                    transition: all 0.3s ease;
+                }
+
+                .custom-pagination .page-link:hover {
+                    background-color: #f8f9fa;
+                }
+
+                .custom-pagination .active .page-link {
+                    background-color: #007bff;
+                    color: white;
+                    border-color: #007bff;
+                }
+
+                .product-action-buttons {
+                    position: absolute;
+                    top: 10px;
+                    right: 10px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 5px;
+                    opacity: 0;
+                    transition: opacity 0.3s ease;
+                }
+
+                .card:hover .product-action-buttons {
+                    opacity: 1;
+                }
+
+                .product-action-btn {
+                    background: white;
+                    border: none;
+                    border-radius: 50%;
+                    width: 35px;
+                    height: 35px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: pointer;
+                    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                    transition: transform 0.2s ease;
+                }
+
+                .product-action-btn:hover {
+                    transform: scale(1.1);
+                }
+
+                .add-to-cart-btn {
+                    width: 100%;
+                    padding: 8px;
+                    margin-top: 10px;
+                    border: none;
+                    border-radius: 4px;
+                    background-color: #007bff;
+                    color: white;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 8px;
+                    transition: background-color 0.3s ease;
+                }
+
+                .add-to-cart-btn:hover {
+                    background-color: #0056b3;
+                }
+
+                .add-to-cart-btn:disabled {
+                    background-color: #ccc;
+                    cursor: not-allowed;
+                }
+
+                .product-options {
+                    font-size: 0.9rem;
+                    color: #6c757d;
+                }
+            `}</style>
         </div>
     );
 };

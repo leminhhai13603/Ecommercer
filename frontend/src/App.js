@@ -24,6 +24,7 @@ import CheckoutPage from './pages/CheckoutPage';
 import ProfilePage from './pages/ProfilePage';
 import OrderHistoryPage from './pages/OrderHistoryPage';
 import ChangePasswordPage from './pages/ChangePasswordPage';
+import RecommendedProducts from './pages/RecommendedProducts';
 
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -51,24 +52,25 @@ const App = () => {
                 <Router>
                     <Layout>
                         <Routes>
-                            {/* Public Routes */}
+                            {/* Public Routes - Không yêu cầu đăng nhập */}
                             <Route path="/login" element={<Login />} />
                             <Route path="/register" element={<Register />} />
                             <Route path="/about" element={<About />} />
                             <Route path="/contact" element={<Contact />} />
                             <Route path="/privacy" element={<Privacy />} />
                             <Route path="/forgot-password" element={<ForgotPassword />} />
+                            <Route path="/" element={<Home />} />
+                            <Route path="/recommended" element={<RecommendedProducts />} />
                             <Route path="/product/:id" element={<ProductDetail />} />
                             
-                            {/* Private Routes */}
-                            <Route path="/" element={<PrivateRoute><Home /></PrivateRoute>} />
+                            {/* Private Routes - Yêu cầu đăng nhập */}
                             <Route path="/cart" element={<PrivateRoute><CartPage /></PrivateRoute>} />
                             <Route path="/checkout" element={<PrivateRoute><CheckoutPage /></PrivateRoute>} />
                             <Route path="/profile" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />  
                             <Route path="/order-history" element={<PrivateRoute><OrderHistoryPage /></PrivateRoute>} />
                             <Route path="/change-password" element={<PrivateRoute><ChangePasswordPage /></PrivateRoute>} />
   
-                            {/* Admin Routes */}
+                            {/* Admin Routes - Yêu cầu đăng nhập admin */}
                             <Route path="/admin" element={<PrivateRoute><AdminLayout /></PrivateRoute>}>
                                 <Route path="products" element={<ProductPage />} />
                                 <Route path="brands" element={<BrandPage />} />
@@ -82,7 +84,6 @@ const App = () => {
                         </Routes>
                     </Layout>
                 </Router>
-                {/* ✅ Di chuyển ToastContainer ra ngoài Router */}
                 <ToastContainer position="top-right" autoClose={3000} hideProgressBar />
             </AuthProvider>
         </ErrorBoundary>

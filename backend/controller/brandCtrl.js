@@ -2,7 +2,6 @@ const Brand = require('../models/brandModel');
 const asyncHandler = require('express-async-handler');
 const validateMongoDbId = require('../utils/validateMongodbid');
 
-// Tạo thương hiệu mới
 const createBrand = asyncHandler(async (req, res) => {
     try {
         const newBrand = await Brand.create(req.body);
@@ -29,7 +28,6 @@ const createBrand = asyncHandler(async (req, res) => {
     }
 });
 
-// Lấy tất cả thương hiệu
 const getAllBrands = asyncHandler(async (req, res) => {
     try {
         const brands = await Brand.find().sort({ title: 1 });
@@ -47,7 +45,6 @@ const getAllBrands = asyncHandler(async (req, res) => {
     }
 });
 
-// Lấy một thương hiệu theo ID
 const getBrand = asyncHandler(async (req, res) => {
     const { id } = req.params;
     validateMongoDbId(id);
@@ -72,7 +69,6 @@ const getBrand = asyncHandler(async (req, res) => {
     }
 });
 
-// Cập nhật thương hiệu
 const updateBrand = asyncHandler(async (req, res) => {
     const { id } = req.params;
     validateMongoDbId(id);
@@ -107,7 +103,6 @@ const updateBrand = asyncHandler(async (req, res) => {
     }
 });
 
-// Xóa thương hiệu
 const deleteBrand = asyncHandler(async (req, res) => {
     const { id } = req.params;
     validateMongoDbId(id);

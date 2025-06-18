@@ -616,7 +616,10 @@ const getOrders = asyncHandler(async (req, res) => {
 
         orders = await Promise.all(orders.map(async (order) => {
             const populatedProducts = await Promise.all(order.products.map(async (item) => {
-                const product = await Product.findById(item.product).select('title price images');
+                const product = await Product.findById(item.product)
+                    .select('title price images')
+                    .populate({ path: 'category', model: 'ProdCategory' })
+                    .populate({ path: 'brand', model: 'Brand' });
                 return {
                     ...item.toObject(),
                     product: product || null

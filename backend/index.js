@@ -15,6 +15,7 @@ const blogCategoryRoute = require('./routes/blogCategoryRoute');
 const brandRoute = require('./routes/brandRoute');
 const couponRoute = require('./routes/couponRoute');
 const chatbotRoutes = require('./routes/chatbotRoutes');
+const recommendationRoute = require('./routes/recommendationRoute');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -68,6 +69,7 @@ app.use('/api/blog-category', blogCategoryRoute);
 app.use('/api/brand', brandRoute);
 app.use('/api/coupon', couponRoute);
 app.use('/api/chatbot', chatbotRoutes);
+app.use('/api/recommendations', recommendationRoute);
 
 // ✅ Health check endpoint
 app.get('/api/health', (req, res) => {

@@ -22,7 +22,6 @@ const createCoupon = asyncHandler(async (req, res) => {
     }
 });
 
-// Lấy tất cả mã giảm giá
 const getAllCoupons = asyncHandler(async (req, res) => {
     try {
         const coupons = await Coupon.find();
@@ -36,7 +35,6 @@ const getAllCoupons = asyncHandler(async (req, res) => {
     }
 });
 
-// Cập nhật mã giảm giá
 const updateCoupon = asyncHandler(async (req, res) => {
     const { id } = req.params;
     validateMongoDbId(id);
@@ -67,7 +65,6 @@ const updateCoupon = asyncHandler(async (req, res) => {
     }
 });
 
-// Xóa mã giảm giá
 const deleteCoupon = asyncHandler(async (req, res) => {
     const { id } = req.params;
     validateMongoDbId(id);
@@ -94,7 +91,6 @@ const deleteCoupon = asyncHandler(async (req, res) => {
     }
 });
 
-// Lấy một mã giảm giá cụ thể
 const getCoupon = asyncHandler(async (req, res) => {
     const { id } = req.params;
     validateMongoDbId(id);
@@ -106,7 +102,6 @@ const getCoupon = asyncHandler(async (req, res) => {
     }
 });
 
-// Kiểm tra tính hợp lệ của mã giảm giá
 const validateCoupon = asyncHandler(async (req, res) => {
     const { name } = req.body;
     try {

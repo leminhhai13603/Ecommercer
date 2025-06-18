@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { getAllBrands, getAllCategories, addToCart, getProductById } from '../api';
 import { toast } from 'react-toastify';
 import { FaTimes, FaMinus, FaPlus, FaShoppingCart, FaEye } from 'react-icons/fa';
 import { Modal, Button, Row, Col, Form } from 'react-bootstrap';
+import { AuthContext } from '../contexts/AuthContext';
 
 const QuickViewModal = ({ show, onClose, product }) => {
     const [quantity, setQuantity] = useState(1);
@@ -11,6 +12,9 @@ const QuickViewModal = ({ show, onClose, product }) => {
     const [category, setCategory] = useState(null);
     const [loading, setLoading] = useState(true);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
+    
+    // Thêm context để kiểm tra đăng nhập
+    const { isAuthenticated } = useContext(AuthContext);
     
     // State cho màu sắc và kích thước đã chọn
     const [selectedColor, setSelectedColor] = useState('');
@@ -58,19 +62,32 @@ const QuickViewModal = ({ show, onClose, product }) => {
                     setAvailableSizes(productSizes);
                     setSelectedSize(productSizes[0]); // Chọn size đầu tiên
                     
-                    // Lấy thông tin thương hiệu và danh mục
+                    // Kiểm tra nếu product.brand là object hoặc string
                     if (product.brand) {
-                        const brandsRes = await getAllBrands();
-                        const brandData = brandsRes.data.data;
-                        const foundBrand = brandData.find(b => b._id === product.brand);
-                        setBrand(foundBrand);
+                        if (typeof product.brand === 'object' && product.brand.title) {
+                            // Nếu brand là object có title, sử dụng trực tiếp
+                            setBrand(product.brand);
+                        } else {
+                            // Nếu brand là ID, lấy thông tin từ API
+                            const brandsRes = await getAllBrands();
+                            const brandData = brandsRes.data.data;
+                            const foundBrand = brandData.find(b => b._id === product.brand);
+                            setBrand(foundBrand);
+                        }
                     }
                     
+                    // Kiểm tra nếu product.category là object hoặc string
                     if (product.category) {
-                        const categoriesRes = await getAllCategories();
-                        const categoryData = categoriesRes.data.data;
-                        const foundCategory = categoryData.find(c => c._id === product.category);
-                        setCategory(foundCategory);
+                        if (typeof product.category === 'object' && product.category.title) {
+                            // Nếu category là object có title, sử dụng trực tiếp
+                            setCategory(product.category);
+                        } else {
+                            // Nếu category là ID, lấy thông tin từ API
+                            const categoriesRes = await getAllCategories();
+                            const categoryData = categoriesRes.data.data;
+                            const foundCategory = categoryData.find(c => c._id === product.category);
+                            setCategory(foundCategory);
+                        }
                     }
                 } catch (error) {
                     console.error('Error fetching product details:', error);
@@ -91,6 +108,22 @@ const QuickViewModal = ({ show, onClose, product }) => {
     };
 
     const handleAddToCart = async () => {
+        // Kiểm tra đăng nhập trước
+        if (!isAuthenticated) {
+            toast.warning('Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng!', {
+                position: "top-center",
+                autoClose: 5000,
+            });
+            
+            // Lưu URL hiện tại để chuyển hướng lại sau khi đăng nhập
+            if (product && product._id) {
+                localStorage.setItem('redirectAfterLogin', `/product/${product._id}`);
+            }
+            
+            onClose(); // Đóng modal
+            return;
+        }
+        
         if (!selectedColor || !selectedSize) {
             toast.warning('Vui lòng chọn màu sắc và kích thước!');
             return;
@@ -168,22 +201,32 @@ const QuickViewModal = ({ show, onClose, product }) => {
                                 {fullProductDetails?.coupon ? (
                                     <div className="price-container mb-3">
                                         <h3 className="text-muted text-decoration-line-through">
-                                            Giá gốc: {fullProductDetails.price.toLocaleString()} VNĐ
+                                            Giá gốc: {(fullProductDetails.price || 0).toLocaleString()} VNĐ
                                         </h3>
                                         <h3 className="text-danger">
-                                            Giá khuyến mãi: {(fullProductDetails.price - (fullProductDetails.price * fullProductDetails.coupon.discount / 100)).toLocaleString()} VNĐ
-                                            <span className="ms-2 badge bg-danger">Giảm {fullProductDetails.coupon.discount}%</span>
+                                            Giá khuyến mãi: {(fullProductDetails.price - (fullProductDetails.price * (fullProductDetails.couponInfo?.discount || 0) / 100) || 0).toLocaleString()} VNĐ
+                                            <span className="ms-2 badge bg-danger">Giảm {fullProductDetails.couponInfo?.discount || 0}%</span>
                                         </h3>
-                                        <div className="small text-success">
-                                            Mã giảm giá: {fullProductDetails.coupon.name} - Còn hiệu lực đến {new Date(fullProductDetails.coupon.expiry).toLocaleDateString()}
-                                        </div>
+                                        {fullProductDetails.couponInfo?.expiry && (
+                                            <div className="small text-success">
+                                                Mã giảm giá: {fullProductDetails.couponInfo?.name || ''} - Còn hiệu lực đến {new Date(fullProductDetails.couponInfo.expiry).toLocaleDateString('vi-VN')}
+                                            </div>
+                                        )}
                                     </div>
                                 ) : (
-                                    <h3>Giá: {fullProductDetails?.price.toLocaleString() || product.price?.toLocaleString()} VNĐ</h3>
+                                    <h3>Giá: {(fullProductDetails?.price || product.price || 0).toLocaleString()} VNĐ</h3>
                                 )}
                                 <p><strong>Mô tả:</strong> {product.description}</p>
-                                <p><strong>Danh mục:</strong> {category?.title || 'Không rõ'}</p>
-                                <p><strong>Thương hiệu:</strong> {brand?.title || 'Không rõ'}</p>
+                                <p><strong>Danh mục:</strong> {
+                                    category?.title || 
+                                    (typeof product.category === 'object' && product.category?.title) || 
+                                    'Không rõ'
+                                }</p>
+                                <p><strong>Thương hiệu:</strong> {
+                                    brand?.title || 
+                                    (typeof product.brand === 'object' && product.brand?.title) || 
+                                    'Không rõ'
+                                }</p>
                                 <p><strong>Số lượng còn:</strong> {fullProductDetails?.quantity || product.quantity}</p>
                                 
                                 {/* Phần chọn màu sắc */}
@@ -243,6 +286,13 @@ const QuickViewModal = ({ show, onClose, product }) => {
                                         </button>
                                     </div>
                                 </div>
+
+                                {/* Thêm thông báo cảnh báo khi không đăng nhập */}
+                                {!isAuthenticated && (
+                                    <div className="alert alert-warning" role="alert">
+                                        <strong>Chú ý:</strong> Bạn cần đăng nhập để thêm sản phẩm vào giỏ hàng!
+                                    </div>
+                                )}
                             </div>
                         </Col>
                     </Row>

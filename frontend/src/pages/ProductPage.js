@@ -27,6 +27,7 @@ const ProductPage = () => {
     const [showForm, setShowForm] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const productsPerPage = 7;
+    const [searchQuery, setSearchQuery] = useState('');
     
     // Danh sách size có sẵn
     const availableSizes = ['S', 'M', 'L', 'XL', 'XXL', 'Free Size'];
@@ -354,13 +355,30 @@ const ProductPage = () => {
         }
     };
 
+    // Xử lý tìm kiếm
+    const handleSearch = (e) => {
+        setSearchQuery(e.target.value);
+        setCurrentPage(1); // Reset về trang đầu tiên khi tìm kiếm
+    };
+
+    // Cập nhật hàm lọc sản phẩm để chỉ tìm kiếm theo tên
+    const filteredProducts = products.filter(product => {
+        if (!searchQuery.trim()) return true; // Nếu không có từ khóa tìm kiếm, hiển thị tất cả
+        
+        const searchTerm = searchQuery.toLowerCase();
+        
+        // Chỉ tìm kiếm theo tên sản phẩm
+        return product.title?.toLowerCase().includes(searchTerm) || false;
+    });
+    
+    // Thay đổi cách tính toán phân trang để sử dụng sản phẩm đã lọc
     const indexOfLastProduct = currentPage * productsPerPage;
     const indexOfFirstProduct = indexOfLastProduct - productsPerPage;
-    const currentProducts = products.slice(indexOfFirstProduct, indexOfLastProduct);
+    const currentProducts = filteredProducts.slice(indexOfFirstProduct, indexOfLastProduct);
 
     const paginate = (pageNumber) => setCurrentPage(pageNumber);
     const handlePrevPage = () => setCurrentPage(prevPage => Math.max(prevPage - 1, 1));
-    const handleNextPage = () => setCurrentPage(prevPage => Math.min(prevPage + 1, Math.ceil(products.length / productsPerPage)));
+    const handleNextPage = () => setCurrentPage(prevPage => Math.min(prevPage + 1, Math.ceil(filteredProducts.length / productsPerPage)));
 
     // Hiển thị màu sắc và size dưới dạng chuỗi để hiển thị trong bảng
     const displayColors = (colors) => {
@@ -433,6 +451,41 @@ const ProductPage = () => {
         return `${coupon.name} (${coupon.discount}%)`;
     };
 
+    // Sửa hàm để xác định chính xác category và brand
+    const getCategoryName = (product) => {
+        if (!product.category) return 'Không có';
+        
+        // Nếu category là object đã được populate
+        if (typeof product.category === 'object' && product.category !== null) {
+            return product.category.title || 'Không xác định';
+        }
+        
+        // Nếu category là id, tìm trong danh sách categories
+        const category = categories.find(c => {
+            // So sánh string để đảm bảo đúng kiểu dữ liệu
+            return c._id.toString() === product.category.toString();
+        });
+        
+        return category ? category.title : 'Không xác định';
+    };
+    
+    const getBrandName = (product) => {
+        if (!product.brand) return 'Không có';
+        
+        // Nếu brand là object đã được populate
+        if (typeof product.brand === 'object' && product.brand !== null) {
+            return product.brand.title || 'Không xác định';
+        }
+        
+        // Nếu brand là id, tìm trong danh sách brands
+        const brand = brands.find(b => {
+            // So sánh string để đảm bảo đúng kiểu dữ liệu
+            return b._id.toString() === product.brand.toString();
+        });
+        
+        return brand ? brand.title : 'Không xác định';
+    };
+
     if (isLoading) return <div>Đang tải...</div>;
     if (error) return <div className="alert alert-danger">{error}</div>;
 
@@ -449,6 +502,38 @@ const ProductPage = () => {
             </div>
 
             {error && <div className="alert alert-danger">{error}</div>}
+
+            {/* Thêm thanh tìm kiếm */}
+            <div className="mb-4">
+                <div className="input-group">
+                    <span className="input-group-text">
+                        ⌕
+                    </span>
+                    <input 
+                        type="text" 
+                        className="form-control" 
+                        placeholder="Tìm kiếm theo tên sản phẩm..." 
+                        value={searchQuery}
+                        onChange={handleSearch}
+                    />
+                    {searchQuery && (
+                        <button 
+                            className="btn btn-outline-secondary" 
+                            type="button"
+                            onClick={() => setSearchQuery('')}
+                        >
+                            &times;
+                        </button>
+                    )}
+                </div>
+                {searchQuery && (
+                    <div className="mt-2">
+                        <small className="text-muted">
+                            Tìm thấy {filteredProducts.length} sản phẩm có tên phù hợp với "{searchQuery}"
+                        </small>
+                    </div>
+                )}
+            </div>
 
             {showForm && (
                 <div className="card mb-4">
@@ -672,8 +757,9 @@ const ProductPage = () => {
                             </thead>
                             <tbody>
                                 {currentProducts.map(product => {
-                                    const categoryName = categories.find(c => c._id === product.category)?.title || 'Không xác định';
-                                    const brandName = brands.find(b => b._id === product.brand)?.title || 'Không xác định';
+                                    // Sử dụng các hàm mới để xác định tên danh mục và thương hiệu
+                                    const categoryName = getCategoryName(product);
+                                    const brandName = getBrandName(product);
                                     
                                     return (
                                         <tr key={product._id}>
@@ -729,7 +815,7 @@ const ProductPage = () => {
                             Trang trước
                         </button>
                         <div className="d-flex gap-2">
-                            {[...Array(Math.ceil(products.length / productsPerPage))].map((_, index) => (
+                            {[...Array(Math.ceil(filteredProducts.length / productsPerPage))].map((_, index) => (
                                 <button
                                     key={index + 1}
                                     className={`btn ${currentPage === index + 1 ? 'btn-primary' : 'btn-outline-primary'}`}
@@ -742,7 +828,7 @@ const ProductPage = () => {
                         <button 
                             className="btn btn-outline-primary" 
                             onClick={handleNextPage} 
-                            disabled={currentPage === Math.ceil(products.length / productsPerPage)}
+                            disabled={currentPage === Math.ceil(filteredProducts.length / productsPerPage)}
                         >
                             Trang sau
                         </button>

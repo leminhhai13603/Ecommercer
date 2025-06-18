@@ -12,13 +12,11 @@ const AdminLayout = () => {
     { path: '/admin/products', label: 'Quản lý Sản phẩm', icon: '📦' },
     { path: '/admin/brands', label: 'Quản lý Thương hiệu', icon: '🏷️' },
     { path: '/admin/product-categories', label: 'Quản lý Danh mục SP', icon: '📁' },
-    { path: '/admin/blogs', label: 'Quản lý Blog', icon: '✍️' },
-    { path: '/admin/blog-categories', label: 'Quản lý Danh mục Blog', icon: '📚' },
+    // { path: '/admin/blogs', label: 'Quản lý Blog', icon: '✍️' },
+    // { path: '/admin/blog-categories', label: 'Quản lý Danh mục Blog', icon: '📚' },
     { path: '/admin/coupons', label: 'Quản lý Coupon', icon: '🎟️' },
     { path: '/admin/users', label: 'Quản lý Người dùng', icon: '👤' },
     { path: '/admin/orders', label: 'Quản lý Đơn hàng', icon: '🛒' },
-    { path: '/admin/privacy', label: 'Chính sách', icon: '📜' },
-    { path: '/admin/contact', label: 'Liên hệ', icon: '📞' },
   ];
 
   return (

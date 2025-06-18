@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import { BsSend, BsRobot, BsPersonCircle, BsXLg, BsChatDots, BsTrash } from 'react-icons/bs';
 import { Link } from 'react-router-dom';
 import { sendChatbotQuery, getChatbotSuggestions, clearChatbotHistory } from '../api';
 import { v4 as uuidv4 } from 'uuid';
+import { AuthContext } from '../contexts/AuthContext';
+import { useLocation } from 'react-router-dom';
 
 const Chatbot = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -13,6 +14,167 @@ const Chatbot = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState('');
   const messagesEndRef = useRef(null);
+  const location = useLocation();
+  const isAdminPage = location.pathname.includes('/admin');
+  
+  // Sử dụng context để kiểm tra đăng nhập
+  const { isAuthenticated } = useContext(AuthContext);
+  
+  // CSS styles object
+  const styles = {
+    chatbotDialog: {
+      position: 'fixed',
+      bottom: '90px',
+      right: '24px',
+      width: '400px',
+      maxWidth: '95vw',
+      height: '620px',
+      background: '#fff',
+      borderRadius: '16px',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+      border: '1px solid #e0e0e0',
+      display: 'flex',
+      flexDirection: 'column',
+      zIndex: 10000,
+      animation: 'chatbot-fade-in 0.2s'
+    },
+    chatbotHeader: {
+      background: '#3B82F6',
+      color: '#fff',
+      padding: '14px 18px',
+      borderTopLeftRadius: '16px',
+      borderTopRightRadius: '16px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between'
+    },
+    chatbotActions: {
+      display: 'flex',
+      alignItems: 'center'
+    },
+    chatbotActionButton: {
+      background: 'transparent',
+      border: 'none',
+      color: '#fff',
+      fontSize: '18px',
+      marginLeft: '2px',
+      cursor: 'pointer',
+      transition: 'color 0.2s',
+      borderRadius: '50%',
+      padding: '4px 6px'
+    },
+    chatbotMessages: {
+      flex: 1,
+      overflowY: 'auto',
+      padding: '18px 14px 8px 14px',
+      background: '#f7f7f7'
+    },
+    message: {
+      display: 'flex',
+      alignItems: 'flex-start',
+      marginBottom: '16px'
+    },
+    userMessage: {
+      flexDirection: 'row-reverse'
+    },
+    messageAvatar: {
+      margin: '0 8px',
+      color: '#3B82F6'
+    },
+    messageContent: {
+      background: '#fff',
+      borderRadius: '10px',
+      padding: '10px 14px',
+      boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+      maxWidth: '75%',
+      minWidth: '60px',
+      fontSize: '15px',
+      position: 'relative',
+      border: '1px solid #e5e7eb'
+    },
+    userMessageContent: {
+      background: '#3B82F6',
+      color: '#fff',
+      border: 'none'
+    },
+    messageTime: {
+      fontSize: '11px',
+      color: '#888',
+      marginTop: '4px',
+      textAlign: 'right'
+    },
+    chatbotSuggestions: {
+      padding: '8px 14px 0 14px',
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: '8px'
+    },
+    suggestionButton: {
+      background: '#f1f5f9',
+      color: '#222',
+      border: '1px solid #e0e0e0',
+      borderRadius: '8px',
+      padding: '6px 14px',
+      fontSize: '14px',
+      cursor: 'pointer',
+      transition: 'background 0.2s, color 0.2s'
+    },
+    chatbotInput: {
+      display: 'flex',
+      alignItems: 'center',
+      padding: '12px 14px',
+      borderTop: '1px solid #e0e0e0',
+      background: '#fff'
+    },
+    inputField: {
+      flex: 1,
+      border: '1px solid #e0e0e0',
+      borderRadius: '20px',
+      padding: '8px 16px',
+      fontSize: '15px',
+      outline: 'none',
+      marginRight: '8px',
+      background: '#f8fafc',
+      transition: 'border 0.2s'
+    },
+    inputFieldFocus: {
+      border: '1.5px solid #3B82F6',
+      background: '#fff'
+    },
+    submitButton: {
+      background: '#3B82F6',
+      color: '#fff',
+      border: 'none',
+      borderRadius: '50%',
+      width: '38px',
+      height: '38px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontSize: '18px',
+      cursor: 'pointer',
+      transition: 'background 0.2s'
+    },
+    chatbotAuthMessage: {
+      padding: '18px 14px 18px 14px',
+      textAlign: 'center'
+    },
+    typingIndicator: {
+      display: 'flex',
+      alignItems: 'center',
+      marginLeft: '10px',
+      marginBottom: '8px'
+    },
+    typingDot: {
+      width: '8px',
+      height: '8px',
+      background: '#bbb',
+      borderRadius: '50%',
+      margin: '0 2px',
+      opacity: 0.5,
+      animation: 'typing-bounce 1.2s infinite alternate'
+    }
+  };
   
   // Tạo hoặc lấy sessionId
   useEffect(() => {
@@ -29,31 +191,47 @@ const Chatbot = () => {
   
   const toggleChatbot = () => {
     setIsOpen(!isOpen);
-    if (!isOpen && messages.length === 0) {
-      // Thêm tin nhắn chào mừng khi mở chatbot lần đầu
-      setMessages([{
-        sender: 'bot',
-        text: 'Xin chào! Tôi là KIA - trợ lý thời trang ảo của cửa hàng quần áo. Tôi có thể giúp bạn tìm kiếm sản phẩm, tư vấn phong cách, hoặc trả lời các câu hỏi về thời trang. Bạn cần hỗ trợ gì?',
-        timestamp: new Date()
-      }]);
+    if (!isOpen) {
+      // Kiểm tra đăng nhập khi mở chatbot
+      if (isAuthenticated) {
+        // Nếu đã đăng nhập và không có tin nhắn, hiển thị tin nhắn chào mừng
+        if (messages.length === 0) {
+          setMessages([{
+            sender: 'bot',
+            text: 'Xin chào! Tôi là trợ lý thời trang ảo của cửa hàng quần áo. Tôi có thể giúp bạn tìm kiếm sản phẩm, tư vấn phong cách, hoặc trả lời các câu hỏi về thời trang. Bạn cần hỗ trợ gì?',
+            timestamp: new Date()
+          }]);
+        }
+      } else {
+        // Nếu chưa đăng nhập, hiển thị thông báo yêu cầu đăng nhập
+        setMessages([{
+          sender: 'bot',
+          text: 'Vui lòng đăng nhập để sử dụng tính năng chatbot. Bạn có thể đăng nhập hoặc đăng ký tài khoản để tiếp tục.',
+          timestamp: new Date(),
+          requireAuth: true // Flag để hiển thị nút đăng nhập
+        }]);
+      }
     }
   };
 
   // Lấy các gợi ý khi component được mount
   useEffect(() => {
-    const fetchSuggestions = async () => {
-      try {
-        const response = await getChatbotSuggestions();
-        if (response.data.success && response.data.suggestions) {
-          setSuggestions(response.data.suggestions);
+    // Chỉ lấy gợi ý khi đã đăng nhập
+    if (isAuthenticated) {
+      const fetchSuggestions = async () => {
+        try {
+          const response = await getChatbotSuggestions();
+          if (response.data.success && response.data.suggestions) {
+            setSuggestions(response.data.suggestions);
+          }
+        } catch (error) {
+          console.error('Lỗi khi lấy gợi ý:', error);
         }
-      } catch (error) {
-        console.error('Lỗi khi lấy gợi ý:', error);
-      }
-    };
-
-    fetchSuggestions();
-  }, []);
+      };
+  
+      fetchSuggestions();
+    }
+  }, [isAuthenticated]);
 
   // Cuộn xuống tin nhắn mới nhất
   useEffect(() => {
@@ -62,11 +240,30 @@ const Chatbot = () => {
     }
   }, [messages]);
 
+  // Xóa message requireAuth khi đăng nhập thành công
+  useEffect(() => {
+    if (isAuthenticated) {
+      setMessages((prev) => prev.filter(msg => !msg.requireAuth));
+    }
+  }, [isAuthenticated]);
+
   const handleInputChange = (e) => {
     setInputValue(e.target.value);
   };
 
   const sendMessage = async (text) => {
+    // Kiểm tra xác thực trước khi gửi tin nhắn
+    if (!isAuthenticated) {
+      setMessages([{
+        sender: 'bot',
+        text: 'Vui lòng đăng nhập để sử dụng tính năng chatbot.',
+        timestamp: new Date(),
+        requireAuth: true
+      }]);
+      setSuggestions([]); // Luôn ẩn gợi ý nếu chưa đăng nhập
+      return;
+    }
+    
     if (!text.trim()) return;
 
     // Thêm tin nhắn của người dùng vào danh sách
@@ -79,20 +276,19 @@ const Chatbot = () => {
     setMessages(prev => [...prev, userMessage]);
     setInputValue('');
     setIsLoading(true);
+    setSuggestions([]); // Luôn ẩn gợi ý khi gửi câu hỏi
 
     try {
       // Gửi câu hỏi đến API với sessionId
       const response = await sendChatbotQuery(text, sessionId);
       
       if (response.data.success) {
-        // Thêm tin nhắn phản hồi từ bot
         const botMessage = {
           sender: 'bot',
           text: response.data.answer,
           timestamp: new Date(),
           products: response.data.products || []
         };
-        
         setMessages(prev => [...prev, botMessage]);
       } else {
         // Xử lý lỗi
@@ -101,22 +297,20 @@ const Chatbot = () => {
           text: 'Xin lỗi, tôi không thể xử lý yêu cầu của bạn lúc này. Vui lòng thử lại sau.',
           timestamp: new Date()
         };
-        
         setMessages(prev => [...prev, errorMessage]);
       }
     } catch (error) {
       console.error('Lỗi khi gửi tin nhắn:', error);
-      
       // Thêm tin nhắn lỗi
       const errorMessage = {
         sender: 'bot',
         text: 'Đã xảy ra lỗi khi xử lý yêu cầu của bạn. Vui lòng thử lại sau.',
         timestamp: new Date()
       };
-      
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+      setSuggestions([]); // Luôn ẩn gợi ý sau khi gửi câu hỏi
     }
   };
 
@@ -137,16 +331,24 @@ const Chatbot = () => {
   const clearChat = async () => {
     try {
       // Xóa lịch sử trên server (nếu đã đăng nhập)
-      if (localStorage.getItem('token')) {
+      if (isAuthenticated) {
         await clearChatbotHistory(sessionId);
+        
+        // Xóa lịch sử local
+        setMessages([{
+          sender: 'bot',
+          text: 'Lịch sử trò chuyện đã được xóa. Bạn cần hỗ trợ gì?',
+          timestamp: new Date()
+        }]);
+      } else {
+        // Nếu chưa đăng nhập
+        setMessages([{
+          sender: 'bot',
+          text: 'Vui lòng đăng nhập để sử dụng tính năng chatbot.',
+          timestamp: new Date(),
+          requireAuth: true
+        }]);
       }
-      
-      // Xóa lịch sử local
-      setMessages([{
-        sender: 'bot',
-        text: 'Lịch sử trò chuyện đã được xóa. Bạn cần hỗ trợ gì?',
-        timestamp: new Date()
-      }]);
     } catch (error) {
       console.error('Lỗi khi xóa lịch sử chat:', error);
       
@@ -247,31 +449,13 @@ const Chatbot = () => {
                 </h4>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
                   <div style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    fontSize: '11px', 
-                    color: '#6B7280' 
+                    fontSize: '13px', 
+                    fontWeight: '600', 
+                    color: '#EF4444'
                   }}>
-                    {/* Hiển thị sao đánh giá */}
-                    <span style={{ 
-                      color: '#F59E0B',
-                      marginRight: '2px'
-                    }}>★</span>
-                    <span>{product.rating}</span>
-                    {product.reviewCount > 0 && (
-                      <span style={{ marginLeft: '3px' }}>({product.reviewCount})</span>
-                    )}
+                    {product.price?.toLocaleString()} ₫
                   </div>
                 </div>
-                <p style={{ 
-                  fontSize: '14px', 
-                  fontWeight: '600', 
-                  color: '#DC2626', 
-                  margin: '0',
-                  textAlign: 'right'
-                }}>
-                  {product.price.toLocaleString('vi-VN')}đ
-                </p>
               </div>
             </Link>
           ))}
@@ -280,324 +464,215 @@ const Chatbot = () => {
     );
   };
 
-  const chatbotStyles = {
-    container: {
-      position: 'fixed',
-      bottom: '20px',
-      right: '20px',
-      zIndex: 9999
-    },
-    chatButton: {
-      width: '56px',
-      height: '56px',
-      borderRadius: '50%',
-      backgroundColor: '#3B82F6',
-      color: 'white',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-      cursor: 'pointer',
-      border: 'none'
-    },
-    chatWindow: {
-      position: 'absolute',
-      bottom: '70px',
-      right: '0',
-      width: '350px',
-      height: '500px',
-      backgroundColor: 'white',
-      borderRadius: '8px',
-      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-      display: 'flex',
-      flexDirection: 'column',
-      border: '1px solid #e0e0e0',
-      overflow: 'hidden'
-    },
-    header: {
-      backgroundColor: '#3B82F6',
-      color: 'white',
-      padding: '12px 16px',
-      borderTopLeftRadius: '8px',
-      borderTopRightRadius: '8px',
-      display: 'flex',
-      alignItems: 'center'
-    },
-    messageContainer: {
-      flex: 1,
-      overflowY: 'auto',
-      padding: '16px',
-      backgroundColor: '#f7f7f7'
-    },
-    messageWrapper: {
-      marginBottom: '16px',
-      display: 'flex'
-    },
-    userMessageWrapper: {
-      justifyContent: 'flex-end'
-    },
-    botMessageWrapper: {
-      justifyContent: 'flex-start'
-    },
-    message: {
-      maxWidth: '80%',
-      padding: '12px',
-      borderRadius: '8px',
-      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
-    },
-    userMessage: {
-      backgroundColor: '#3B82F6',
-      color: 'white'
-    },
-    botMessage: {
-      backgroundColor: 'white',
-      border: '1px solid #e0e0e0'
-    },
-    inputContainer: {
-      padding: '12px',
-      borderTop: '1px solid #e0e0e0',
-      backgroundColor: 'white'
-    },
-    inputForm: {
-      display: 'flex',
-      alignItems: 'center'
-    },
-    input: {
-      flex: 1,
-      padding: '10px 16px',
-      borderRadius: '20px',
-      border: '1px solid #e0e0e0',
-      outline: 'none'
-    },
-    sendButton: {
-      width: '40px',
-      height: '40px',
-      borderRadius: '50%',
-      backgroundColor: '#3B82F6',
-      color: 'white',
-      marginLeft: '8px',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      border: 'none',
-      cursor: 'pointer'
-    },
-    typingIndicator: {
-      display: 'flex',
-      alignItems: 'center',
-      marginTop: '8px'
-    },
-    typingDot: {
-      height: '8px',
-      width: '8px',
-      margin: '0 2px',
-      backgroundColor: '#bbb',
-      borderRadius: '50%',
-      display: 'inline-block',
-      opacity: 0.4,
-      animation: 'typing 1.4s infinite ease-in-out'
-    }
-  };
+  // Hàm chuyển markdown đơn giản sang HTML (bold, xuống dòng)
+  function formatBotText(text) {
+    if (!text) return '';
+    // Chuyển **text** thành <b>text</b>
+    let html = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+    // Chuyển \n thành <br>
+    html = html.replace(/\n/g, '<br>');
+    return html;
+  }
 
   return (
-    <div style={chatbotStyles.container}>
-      {/* Nút chat */}
-      <button 
-        style={chatbotStyles.chatButton}
-        onClick={toggleChatbot}
+    <div className="chatbot-container">
+      {/* CSS Animation Keyframes */}
+      <style jsx>{`
+        @keyframes chatbot-fade-in {
+          from { opacity: 0; transform: translateY(30px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes typing-bounce {
+          0% { transform: translateY(0); opacity: 0.5; }
+          50% { transform: translateY(-5px); opacity: 1; }
+          100% { transform: translateY(0); opacity: 0.5; }
+        }
+        @media (max-width: 600px) {
+          .chatbot-dialog-mobile {
+            width: 98vw !important;
+            min-width: 0 !important;
+            right: 1vw !important;
+            left: 1vw !important;
+            height: 90vh !important;
+            bottom: 70px !important;
+          }
+        }
+      `}</style>
+
+      {/* Toggle button */}
+      {!isAdminPage && (
+        <button 
+        onClick={toggleChatbot} 
+        className="chatbot-toggle-button"
+        style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          zIndex: 9999,
+          width: '56px',
+          height: '56px',
+          borderRadius: '50%',
+          backgroundColor: '#3B82F6',
+          color: 'white',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+          border: 'none',
+          cursor: 'pointer',
+          fontSize: '20px',
+        }}
       >
-        {isOpen ? <BsXLg size={24} /> : <BsChatDots size={24} />}
-      </button>
-      
-      {/* Chatbot container */}
+        <BsChatDots size={24} />
+        </button>
+      )}
+      {/* Chatbot dialog */}
       {isOpen && (
-        <div style={chatbotStyles.chatWindow}>
-          {/* Header */}
-          <div style={chatbotStyles.header}>
-            <BsRobot size={24} style={{ marginRight: '8px' }} />
-            <div>
-              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '500' }}>Trợ lý ảo</h3>
-              <p style={{ margin: 0, fontSize: '12px', opacity: 0.8 }}>Hỗ trợ tìm kiếm sản phẩm</p>
+        <div 
+          className={window.innerWidth <= 600 ? "chatbot-dialog-mobile" : ""}
+          style={styles.chatbotDialog}
+        >
+          <div style={styles.chatbotHeader}>
+            <div className="d-flex align-items-center">
+              <BsRobot className="me-2" size={20} />
+              <h4 className="mb-0 fw-bold">Trợ lý thời trang</h4>
             </div>
-            <div style={{ marginLeft: 'auto', display: 'flex', gap: '10px' }}>
+            <div style={styles.chatbotActions}>
+              {isAuthenticated && messages.length > 0 && (
+                <button 
+                  onClick={clearChat} 
+                  style={styles.chatbotActionButton}
+                  title="Xóa cuộc trò chuyện"
+                  onMouseEnter={(e) => e.target.style.background = '#2563eb'}
+                  onMouseLeave={(e) => e.target.style.background = 'transparent'}
+                >
+                  <BsTrash />
+                </button>
+              )}
               <button 
-                onClick={clearChat}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: 'white',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '4px',
-                  borderRadius: '4px',
-                  opacity: '0.8',
-                  transition: 'opacity 0.2s'
-                }}
-                title="Xóa lịch sử trò chuyện"
-                onMouseOver={(e) => e.currentTarget.style.opacity = '1'}
-                onMouseOut={(e) => e.currentTarget.style.opacity = '0.8'}
+                onClick={toggleChatbot} 
+                style={styles.chatbotActionButton}
+                title="Đóng"
+                onMouseEnter={(e) => e.target.style.background = '#2563eb'}
+                onMouseLeave={(e) => e.target.style.background = 'transparent'}
               >
-                <BsTrash size={16} />
+                <BsXLg />
               </button>
             </div>
           </div>
           
-          {/* Messages */}
-          <div style={chatbotStyles.messageContainer}>
-            {messages.map((msg, index) => (
+          <div style={styles.chatbotMessages}>
+            {messages.map((message, index) => (
               <div 
                 key={index} 
                 style={{
-                  ...chatbotStyles.messageWrapper,
-                  ...(msg.sender === 'user' ? chatbotStyles.userMessageWrapper : chatbotStyles.botMessageWrapper)
+                  ...styles.message,
+                  ...(message.sender === 'user' ? styles.userMessage : {})
                 }}
               >
-                <div 
-                  style={{
-                    ...chatbotStyles.message,
-                    ...(msg.sender === 'user' ? chatbotStyles.userMessage : chatbotStyles.botMessage)
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
-                    {msg.sender === 'user' ? (
-                      <>
-                        <span style={{ fontSize: '12px', opacity: 0.8, marginRight: '4px' }}>{formatTimestamp(msg.timestamp)}</span>
-                        <BsPersonCircle size={14} />
-                      </>
-                    ) : (
-                      <>
-                        <BsRobot size={14} style={{ marginRight: '4px' }} />
-                        <span style={{ fontSize: '12px', opacity: 0.8 }}>{formatTimestamp(msg.timestamp)}</span>
-                      </>
-                    )}
-                  </div>
-                  <div style={{ fontSize: '14px', whiteSpace: 'pre-wrap' }}>{msg.text}</div>
-                  {msg.sender === 'bot' && msg.products && renderProductSuggestions(msg.products)}
+                <div style={styles.messageAvatar}>
+                  {message.sender === 'user' ? 
+                    <BsPersonCircle size={24} /> : 
+                    <BsRobot size={24} />
+                  }
+                </div>
+                <div style={{
+                  ...styles.messageContent,
+                  ...(message.sender === 'user' ? styles.userMessageContent : {})
+                }}>
+                  {/* Hiển thị text: nếu là bot thì render HTML đã xử lý, nếu là user thì render thường */}
+                  {message.sender === 'bot' ? (
+                    <div className="message-text" dangerouslySetInnerHTML={{ __html: formatBotText(message.text) }} />
+                  ) : (
+                    <div className="message-text">{message.text}</div>
+                  )}
+                  {/* Hiển thị nút đăng nhập nếu cần */}
+                  {message.requireAuth && (
+                    <div className="auth-buttons mt-2">
+                      <Link to="/login" className="btn btn-primary btn-sm me-2">Đăng nhập</Link>
+                      <Link to="/register" className="btn btn-outline-primary btn-sm">Đăng ký</Link>
+                    </div>
+                  )}
+                  {/* Hiển thị sản phẩm nếu có */}
+                  {message.products && message.products.length > 0 && renderProductSuggestions(message.products)}
+                  <div style={styles.messageTime}>{formatTimestamp(message.timestamp)}</div>
                 </div>
               </div>
             ))}
+            
             {isLoading && (
-              <div style={{ ...chatbotStyles.messageWrapper, ...chatbotStyles.botMessageWrapper }}>
-                <div style={{ ...chatbotStyles.message, ...chatbotStyles.botMessage }}>
-                  <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <BsRobot size={14} style={{ marginRight: '4px' }} />
-                    <span style={{ fontSize: '12px', opacity: 0.8 }}>{formatTimestamp(new Date())}</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', marginTop: '8px' }}>
-                    <div style={{ 
-                      height: '8px', 
-                      width: '8px', 
-                      margin: '0 2px', 
-                      backgroundColor: '#bbb', 
-                      borderRadius: '50%', 
-                      display: 'inline-block', 
-                      opacity: 0.4,
-                      animation: 'typing 1.4s infinite ease-in-out',
-                      animationDelay: '0s'
-                    }}></div>
-                    <div style={{ 
-                      height: '8px', 
-                      width: '8px', 
-                      margin: '0 2px', 
-                      backgroundColor: '#bbb', 
-                      borderRadius: '50%', 
-                      display: 'inline-block', 
-                      opacity: 0.4,
-                      animation: 'typing 1.4s infinite ease-in-out',
-                      animationDelay: '0.2s'
-                    }}></div>
-                    <div style={{ 
-                      height: '8px', 
-                      width: '8px', 
-                      margin: '0 2px', 
-                      backgroundColor: '#bbb', 
-                      borderRadius: '50%', 
-                      display: 'inline-block', 
-                      opacity: 0.4,
-                      animation: 'typing 1.4s infinite ease-in-out',
-                      animationDelay: '0.4s'
-                    }}></div>
-                  </div>
-                </div>
+              <div style={styles.typingIndicator}>
+                <div style={{...styles.typingDot, animationDelay: '0s'}}></div>
+                <div style={{...styles.typingDot, animationDelay: '0.2s'}}></div>
+                <div style={{...styles.typingDot, animationDelay: '0.4s'}}></div>
               </div>
             )}
+            
             <div ref={messagesEndRef} />
           </div>
           
-          {/* Suggestions */}
-          {messages.length <= 2 && suggestions.length > 0 && (
-            <div style={{ padding: '12px', borderTop: '1px solid #e0e0e0', backgroundColor: '#f7f7f7' }}>
-              <p style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>Gợi ý:</p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                {suggestions.map((suggestion, index) => (
-                  <button
-                    key={index}
-                    style={{ 
-                      fontSize: '12px', 
-                      backgroundColor: '#EBF5FF', 
-                      color: '#3B82F6', 
-                      padding: '4px 8px', 
-                      borderRadius: '16px',
-                      border: 'none',
-                      cursor: 'pointer',
-                      transition: 'background-color 0.2s'
-                    }}
-                    onClick={() => handleSuggestionClick(suggestion)}
-                  >
-                    {suggestion}
-                  </button>
-                ))}
+          {isAuthenticated ? (
+            <>
+              {suggestions.length > 0 && (
+                <div style={styles.chatbotSuggestions}>
+                  {suggestions.map((suggestion, index) => (
+                    <button 
+                      key={index} 
+                      onClick={() => handleSuggestionClick(suggestion)}
+                      style={styles.suggestionButton}
+                      onMouseEnter={(e) => {
+                        e.target.style.background = '#3B82F6';
+                        e.target.style.color = '#fff';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.background = '#f1f5f9';
+                        e.target.style.color = '#222';
+                      }}
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <form onSubmit={handleSubmit} style={styles.chatbotInput}>
+                <input
+                  type="text"
+                  value={inputValue}
+                  onChange={handleInputChange}
+                  placeholder="Nhập câu hỏi của bạn..."
+                  disabled={isLoading}
+                  style={styles.inputField}
+                  onFocus={(e) => {
+                    e.target.style.border = '1.5px solid #3B82F6';
+                    e.target.style.background = '#fff';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.border = '1px solid #e0e0e0';
+                    e.target.style.background = '#f8fafc';
+                  }}
+                />
+                <button 
+                  type="submit" 
+                  disabled={isLoading || !inputValue.trim()}
+                  style={styles.submitButton}
+                  onMouseEnter={(e) => e.target.style.background = '#2563eb'}
+                  onMouseLeave={(e) => e.target.style.background = '#3B82F6'}
+                >
+                  <BsSend />
+                </button>
+              </form>
+            </>
+          ) : (
+            <div style={styles.chatbotAuthMessage}>
+              <p className="text-center mb-2">Vui lòng đăng nhập để tiếp tục trò chuyện</p>
+              <div className="d-flex justify-content-center">
+                <Link to="/login" className="btn btn-primary btn-sm me-2">Đăng nhập</Link>
+                <Link to="/register" className="btn btn-outline-primary btn-sm">Đăng ký</Link>
               </div>
             </div>
           )}
-          
-          {/* Input */}
-          <form onSubmit={handleSubmit} style={chatbotStyles.inputContainer}>
-            <div style={chatbotStyles.inputForm}>
-              <input
-                type="text"
-                value={inputValue}
-                onChange={handleInputChange}
-                placeholder="Nhập câu hỏi của bạn..."
-                style={chatbotStyles.input}
-                disabled={isLoading}
-              />
-              <button
-                type="submit"
-                style={{
-                  ...chatbotStyles.sendButton,
-                  opacity: !inputValue.trim() || isLoading ? 0.5 : 1
-                }}
-                disabled={!inputValue.trim() || isLoading}
-              >
-                <BsSend size={18} />
-              </button>
-            </div>
-          </form>
         </div>
       )}
-      
-      {/* CSS cho typing animation */}
-      <style>
-        {`
-          @keyframes typing {
-            0% {
-              transform: translateY(0px);
-              opacity: 0.4;
-            }
-            50% {
-              transform: translateY(-5px);
-              opacity: 0.9;
-            }
-            100% {
-              transform: translateY(0px);
-              opacity: 0.4;
-            }
-          }
-        `}
-      </style>
     </div>
   );
 };

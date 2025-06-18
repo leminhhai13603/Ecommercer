@@ -10,6 +10,10 @@ const OrderPage = () => {
     const [loading, setLoading] = useState(false);
     const [currentPage, setCurrentPage] = useState(0);
     const [processingOrder, setProcessingOrder] = useState(null);
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
+    const [filteredOrders, setFilteredOrders] = useState([]);
+    const [totalRevenue, setTotalRevenue] = useState(0);
     const ordersPerPage = 5;
 
     const fetchUserNames = useCallback(async (orders) => {
@@ -36,7 +40,11 @@ const OrderPage = () => {
         setLoading(true);
         try {
             const response = await getAllOrders();
-            const orderData = response.data?.data || [];
+            const orderData = Array.isArray(response.data)
+            ? response.data
+            : Array.isArray(response.data?.data)
+                ? response.data.data
+                : [];
             setOrders(orderData);
             await fetchUserNames(orderData);
         } catch (error) {
@@ -105,9 +113,50 @@ const OrderPage = () => {
         setCurrentPage(event.selected);
     };
 
-    const offset = currentPage * ordersPerPage;
-    const currentOrders = Array.isArray(orders) ? orders.slice(offset, offset + ordersPerPage) : [];
-    const pageCount = Math.ceil((Array.isArray(orders) ? orders.length : 0) / ordersPerPage);
+    const filterOrdersByDate = useCallback((ordersData) => {
+        if (!startDate && !endDate) return ordersData;
+
+        return ordersData.filter(order => {
+            const orderDate = new Date(order.createdAt);
+            const start = startDate ? new Date(startDate) : new Date(0);
+            const end = endDate ? new Date(endDate) : new Date();
+            
+            start.setHours(0, 0, 0, 0);
+            end.setHours(23, 59, 59, 999);
+
+            return orderDate >= start && orderDate <= end;
+        });
+    }, [startDate, endDate]);
+
+    useEffect(() => {
+        const filtered = filterOrdersByDate(orders);
+        setFilteredOrders(filtered);
+
+        const revenue = filtered.reduce((total, order) => {
+            const orderTotal = order.products.reduce((sum, item) => {
+                return item.product ? sum + (item.product.price * item.quantity) : sum;
+            }, 0);
+            return total + orderTotal;
+        }, 0);
+        
+        setTotalRevenue(revenue);
+    }, [orders, filterOrdersByDate]);
+
+    const handleDateChange = (e) => {
+        const { name, value } = e.target;
+        if (name === 'startDate') {
+            setStartDate(value);
+            setCurrentPage(0);
+        } else if (name === 'endDate') {
+            setEndDate(value);
+            setCurrentPage(0);
+        }
+    };
+
+    const getCurrentOrders = useCallback(() => {
+        const offset = currentPage * ordersPerPage;
+        return filteredOrders.slice(offset, offset + ordersPerPage);
+    }, [currentPage, filteredOrders]);
 
     if (loading) {
         return (
@@ -126,11 +175,54 @@ const OrderPage = () => {
         <div className="container mt-4">
             <h1 className="mb-4">Quản lý Đơn hàng</h1>
 
+            <div className="row mb-4">
+                <div className="col-md-3">
+                    <div className="form-group">
+                        <label className="form-label">Từ ngày:</label>
+                        <input
+                            type="date"
+                            className="form-control"
+                            name="startDate"
+                            value={startDate}
+                            onChange={handleDateChange}
+                        />
+                    </div>
+                </div>
+                <div className="col-md-3">
+                    <div className="form-group">
+                        <label className="form-label">Đến ngày:</label>
+                        <input
+                            type="date"
+                            className="form-control"
+                            name="endDate"
+                            value={endDate}
+                            onChange={handleDateChange}
+                        />
+                    </div>
+                </div>
+                <div className="col-md-6">
+                    <div className="card bg-success text-white">
+                        <div className="card-body">
+                            <h5 className="card-title">Tổng doanh thu</h5>
+                            <h3 className="card-text">
+                                {totalRevenue.toLocaleString()} VNĐ
+                            </h3>
+                            <small>
+                                {startDate && endDate 
+                                    ? `Từ ${new Date(startDate).toLocaleDateString('vi-VN')} đến ${new Date(endDate).toLocaleDateString('vi-VN')}`
+                                    : 'Tất cả thời gian'}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div className="table-responsive">
                 <table className="table table-bordered">
                     <thead className="table-light">
                         <tr>
                             <th>Mã đơn hàng</th>
+                            <th>Ngày đặt</th>
                             <th>Khách hàng</th>
                             <th>Email</th>
                             <th>Địa chỉ</th>
@@ -140,8 +232,8 @@ const OrderPage = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        {currentOrders.length > 0 ? (
-                            currentOrders.map(order => {
+                        {getCurrentOrders().length > 0 ? (
+                            getCurrentOrders().map(order => {
                                 try {
                                     const totalAmount = order.products.reduce((total, item) => {
                                         return item.product ? total + item.product.price * item.quantity : total;
@@ -150,6 +242,7 @@ const OrderPage = () => {
                                     return (
                                         <tr key={order._id}>
                                             <td>{order._id.slice(-8)}</td>
+                                            <td>{new Date(order.createdAt).toLocaleDateString('vi-VN')}</td>
                                             <td>{userNames[order.user?._id] || "Không có tên"}</td>
                                             <td>{order.user?.email || 'Không có email'}</td>
                                             <td>
@@ -163,28 +256,28 @@ const OrderPage = () => {
                                             </td>
                                             <td>
                                                 <button 
-                                                    className="btn btn-info btn-sm me-2" 
+                                                    className="btn btn-info btn-sm py-0 px-2 me-1" 
                                                     onClick={() => handleStatusChange(order._id, 'Đang xử lý')} 
                                                     disabled={order.orderStatus === 'Đang xử lý' || processingOrder === order._id}
                                                 >
                                                     Xử lý
                                                 </button>
                                                 <button 
-                                                    className="btn btn-warning btn-sm me-2" 
+                                                    className="btn btn-warning btn-sm py-0 px-2 me-1" 
                                                     onClick={() => handleStatusChange(order._id, 'Đang giao hàng')} 
                                                     disabled={order.orderStatus === 'Đang giao hàng' || processingOrder === order._id}
                                                 >
                                                     Giao hàng
                                                 </button>
                                                 <button 
-                                                    className="btn btn-success btn-sm me-2" 
+                                                    className="btn btn-success btn-sm py-0 px-2 me-1" 
                                                     onClick={() => handleStatusChange(order._id, 'Đã giao hàng')} 
                                                     disabled={order.orderStatus === 'Đã giao hàng' || processingOrder === order._id}
                                                 >
                                                     Hoàn thành
                                                 </button>
                                                 <button 
-                                                    className="btn btn-danger btn-sm" 
+                                                    className="btn btn-danger py-0 px-2 btn-sm" 
                                                     onClick={() => handleStatusChange(order._id, 'Đã hủy')} 
                                                     disabled={order.orderStatus === 'Đã hủy' || processingOrder === order._id}
                                                 >
@@ -197,25 +290,8 @@ const OrderPage = () => {
                                     console.error("Lỗi khi hiển thị đơn hàng:", error, order);
                                     return (
                                         <tr key={order._id || Math.random().toString()}>
-                                            <td>{order._id ? order._id.slice(-8) : 'N/A'}</td>
-                                            <td>{userNames[order.user?._id] || "Không có tên"}</td>
-                                            <td>{order.user?.email || 'Không có email'}</td>
-                                            <td>
-                                                {order.shippingInfo?.address}, {order.shippingInfo?.city}
-                                            </td>
-                                            <td>Không rõ (Lỗi dữ liệu)</td>
-                                            <td>
-                                                <span className={`badge ${getStatusClass(order.orderStatus)}`}>
-                                                    {order.orderStatus || 'Không rõ'}
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <button 
-                                                    className="btn btn-danger btn-sm" 
-                                                    disabled={true}
-                                                >
-                                                    Lỗi dữ liệu
-                                                </button>
+                                            <td colSpan="8" className="text-center text-danger">
+                                                Lỗi hiển thị đơn hàng
                                             </td>
                                         </tr>
                                     );
@@ -223,7 +299,7 @@ const OrderPage = () => {
                             })
                         ) : (
                             <tr>
-                                <td colSpan="7" className="text-center">Không có đơn hàng nào.</td>
+                                <td colSpan="8" className="text-center">Không có đơn hàng nào trong khoảng thời gian này.</td>
                             </tr>
                         )}
                     </tbody>
@@ -233,7 +309,7 @@ const OrderPage = () => {
             <ReactPaginate
                 previousLabel={'← Trước'}
                 nextLabel={'Sau →'}
-                pageCount={pageCount}
+                pageCount={Math.ceil(filteredOrders.length / ordersPerPage)}
                 onPageChange={handlePageClick}
                 containerClassName={'pagination justify-content-center mt-4'}
                 pageClassName={'page-item'}
@@ -245,6 +321,23 @@ const OrderPage = () => {
                 activeClassName={'active'}
                 disabledClassName={'disabled'}
             />
+
+            <style>{`
+                .form-group {
+                    margin-bottom: 1rem;
+                }
+                .card {
+                    transition: all 0.3s ease;
+                }
+                .card:hover {
+                    transform: translateY(-5px);
+                    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+                }
+                .badge {
+                    font-size: 0.9em;
+                    padding: 0.5em 1em;
+                }
+            `}</style>
         </div>
     );
 };

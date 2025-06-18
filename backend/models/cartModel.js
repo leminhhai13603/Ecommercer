@@ -24,7 +24,7 @@ const cartSchema = new mongoose.Schema({
         price: Number,
     }],
     cartTotal: Number,
-    totalAfterDiscount: Number
+    // totalAfterDiscount: Number
 }, { timestamps: true });
 
 const Cart = mongoose.model('Cart', cartSchema);

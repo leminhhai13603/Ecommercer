@@ -22,7 +22,7 @@ const productSchema = new mongoose.Schema({
     },
     category: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Category',
+        ref: 'ProdCategory',
     },
     brand: {
         type: mongoose.Schema.Types.ObjectId,
@@ -80,7 +80,22 @@ const productSchema = new mongoose.Schema({
     coupon: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Coupon'
-    }
+    },
+    viewCount: {
+        type: Number,
+        default: 0
+    },
+    similarProducts: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Product'
+    }],
+    tags: [{
+        type: String
+    }]
 }, {timestamps: true});
+
+productSchema.index({ style: 1, season: 1, material: 1, gender: 1, category: 1 });
+productSchema.index({ viewCount: -1 });
+productSchema.index({ tags: 1 });
 
 module.exports = mongoose.model('Product', productSchema);

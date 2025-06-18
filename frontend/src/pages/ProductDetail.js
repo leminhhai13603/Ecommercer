@@ -1,8 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { getProductById, getAllCategories, getAllBrands, getAllUsers, submitProductRating, addToCart as apiAddToCart } from '../api';
+import React, { useEffect, useState, useContext } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { getProductById, getAllCategories, getAllBrands, getAllUsers, submitProductRating, addToCart as apiAddToCart, recordUserInteraction } from '../api';
 import { toast } from 'react-toastify';
-import { FaStar } from 'react-icons/fa';
+import { FaStar, FaShoppingCart, FaHeart, FaShare, FaTruck, FaUndo, FaShieldAlt } from 'react-icons/fa';
+import { AuthContext } from '../contexts/AuthContext';
+import ImageGallery from '../components/ImageGallery';
+import SimilarProducts from '../components/SimilarProducts';
 
 const ProductDetail = () => {
     const { id } = useParams();
@@ -24,6 +27,8 @@ const ProductDetail = () => {
     // Danh sách màu sắc và kích thước có sẵn
     const [availableColors, setAvailableColors] = useState(['']);
     const [availableSizes, setAvailableSizes] = useState([]);
+
+    const { isAuthenticated } = useContext(AuthContext);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -71,14 +76,34 @@ const ProductDetail = () => {
         fetchData();
     }, [id]);
 
-    const getCategoryName = (categoryId) => {
-        const category = categories.find(cat => cat._id === categoryId);
-        return category ? category.title : 'Không rõ';
+    const getCategoryName = (category) => {
+        // Nếu category là object có thuộc tính title, trả về title
+        if (category && typeof category === 'object' && category.title) {
+            return category.title;
+        }
+        
+        // Nếu category là ID string, tìm kiếm trong danh sách categories
+        if (category && typeof category === 'string') {
+            const foundCategory = categories.find(cat => cat._id === category);
+            return foundCategory ? foundCategory.title : 'Không rõ';
+        }
+        
+        return 'Không rõ';
     };
 
-    const getBrandName = (brandId) => {
-        const brand = brands.find(brand => brand._id === brandId);
-        return brand ? brand.title : 'Không rõ';
+    const getBrandName = (brand) => {
+        // Nếu brand là object có thuộc tính title, trả về title
+        if (brand && typeof brand === 'object' && brand.title) {
+            return brand.title;
+        }
+        
+        // Nếu brand là ID string, tìm kiếm trong danh sách brands
+        if (brand && typeof brand === 'string') {
+            const foundBrand = brands.find(b => b._id === brand);
+            return foundBrand ? foundBrand.title : 'Không rõ';
+        }
+        
+        return 'Không rõ';
     };
 
     const getUserName = (userId) => {
@@ -109,16 +134,45 @@ const ProductDetail = () => {
         }
     };
 
+    // Cập nhật hàm ghi lại tương tác
+    const recordInteraction = async (interactionType) => {
+        if (!isAuthenticated || !id) return;
+        
+        try {
+            await recordUserInteraction(id, interactionType);
+        } catch (error) {
+            console.error('Lỗi khi ghi lại tương tác:', error);
+        }
+    };
+
+    // Ghi lại tương tác xem khi vào trang
+    useEffect(() => {
+        if (product?._id) {
+            recordInteraction('view');
+        }
+    }, [product?._id]);
+
+    // Cập nhật hàm addToCart để ghi lại tương tác
     const handleAddToCart = async () => {
+        if (!isAuthenticated) {
+            toast.warning('Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng!', {
+                position: "top-center",
+                autoClose: 5000,
+            });
+            // Lưu URL hiện tại để chuyển hướng lại sau khi đăng nhập
+            localStorage.setItem('redirectAfterLogin', `/product/${id}`);
+            return;
+        }
+        
         if (!selectedColor || !selectedSize) {
             toast.warning('Vui lòng chọn màu sắc và kích thước!');
             return;
         }
         
         try {
-            const response = await apiAddToCart(product._id, quantity, selectedColor, selectedSize);
-            console.log('Thêm giỏ hàng thành công:', response);
+            await apiAddToCart(id, quantity, selectedColor, selectedSize);
             toast.success('Sản phẩm đã được thêm vào giỏ hàng!');
+            recordInteraction('cart');
         } catch (error) {
             console.error('Error adding to cart:', error);
             toast.error(`Không thể thêm sản phẩm vào giỏ hàng: ${error.response?.data?.message || 'Vui lòng thử lại.'}`);
@@ -141,33 +195,30 @@ const ProductDetail = () => {
     }
 
     return (
-        <div className="container mt-5">
+        <div className="container my-5">
             <h1 className="mb-4">{product.title}</h1>
             <div className="row">
                 <div className="col-md-6">
-                    <img
-                        src={product.images?.[0]?.url || 'https://via.placeholder.com/500'}
-                        alt={product.title}
-                        className="img-fluid"
-                        style={{ maxHeight: '500px', objectFit: 'contain' }}
-                    />
+                    <ImageGallery images={product.images || []} />
                 </div>
                 <div className="col-md-6">
                     {product.coupon ? (
                         <div className="price-container mb-3">
                             <h3 className="text-muted text-decoration-line-through">
-                                Giá gốc: {product.price.toLocaleString()} VNĐ
+                                Giá gốc: {(product.price || 0).toLocaleString()} VNĐ
                             </h3>
                             <h3 className="text-danger">
-                                Giá khuyến mãi: {(product.price - (product.price * product.coupon.discount / 100)).toLocaleString()} VNĐ
-                                <span className="ms-2 badge bg-danger">Giảm {product.coupon.discount}%</span>
+                                Giá khuyến mãi: {(product.price - (product.price * (product.couponInfo?.discount || 0) / 100) || 0).toLocaleString()} VNĐ
+                                <span className="ms-2 badge bg-danger">Giảm {product.couponInfo?.discount || 0}%</span>
                             </h3>
-                            <div className="small text-success">
-                                Mã giảm giá: {product.coupon.name} - Còn hiệu lực đến {new Date(product.coupon.expiry).toLocaleDateString()}
-                            </div>
+                            {product.couponInfo?.expiry && (
+                                <div className="small text-success">
+                                    Mã giảm giá: {product.couponInfo?.name || ''} - Còn hiệu lực đến {new Date(product.couponInfo.expiry).toLocaleDateString('vi-VN')}
+                                </div>
+                            )}
                         </div>
                     ) : (
-                        <h3>Giá: {product.price.toLocaleString()} VNĐ</h3>
+                        <h3>Giá: {(product.price || 0).toLocaleString()} VNĐ</h3>
                     )}
                     <p><strong>Mô tả:</strong> {product.description}</p>
                     <p><strong>Danh mục:</strong> {getCategoryName(product.category)}</p>
@@ -211,25 +262,38 @@ const ProductDetail = () => {
                     )}
                     
                     {/* Phần chọn số lượng */}
-                    <div className="mb-3">
-                        <label className="form-label"><strong>Số lượng:</strong></label>
-                        <div className="d-flex align-items-center">
+                    <div className="product-action mt-4 d-flex flex-column">
+                        <div className="d-flex align-items-center mb-3">
+                            <div className="quantity-selector d-flex align-items-center me-3">
+                                <button 
+                                    className="btn btn-outline-dark btn-sm" 
+                                    onClick={() => handleQuantityChange(-1)}
+                                    disabled={quantity <= 1}
+                                >-</button>
+                                <span className="mx-2">{quantity}</span>
+                                <button 
+                                    className="btn btn-outline-dark btn-sm" 
+                                    onClick={() => handleQuantityChange(1)}
+                                    disabled={quantity >= product.quantity}
+                                >+</button>
+                            </div>
+                            
                             <button 
-                                className="btn btn-outline-secondary" 
-                                onClick={() => handleQuantityChange(-1)}
-                                disabled={quantity <= 1}
+                                className="btn btn-primary d-flex align-items-center"
+                                onClick={handleAddToCart}
                             >
-                                -
-                            </button>
-                            <span className="mx-3">{quantity}</span>
-                            <button 
-                                className="btn btn-outline-secondary" 
-                                onClick={() => handleQuantityChange(1)}
-                                disabled={quantity >= product.quantity}
-                            >
-                                +
+                                <FaShoppingCart className="me-2" />
+                                Thêm vào giỏ hàng
                             </button>
                         </div>
+                        
+                        {!isAuthenticated && (
+                            <div className="alert alert-warning d-flex align-items-center" role="alert">
+                                <div>
+                                    <strong>Chú ý:</strong> Bạn cần <Link to="/login" className="alert-link">đăng nhập</Link> để mua hàng hoặc thêm vào giỏ hàng!
+                                </div>
+                            </div>
+                        )}
                     </div>
                     
                     <p><strong>Tổng đánh giá:</strong> {
@@ -237,13 +301,6 @@ const ProductDetail = () => {
                             <FaStar key={i} color={i < product.totalrating ? '#ffc107' : '#e4e5e9'} />
                         ))
                     }</p>
-                    <button 
-                        className="btn btn-success mt-3" 
-                        onClick={handleAddToCart} 
-                        disabled={product.quantity <= 0}
-                    >
-                        {product.quantity > 0 ? 'Thêm vào giỏ hàng' : 'Hết hàng'}
-                    </button>
                 </div>
             </div>
 
@@ -298,6 +355,17 @@ const ProductDetail = () => {
                     </button>
                 </div>
             </div>
+
+            {/* Similar Products Section */}
+            {product && (
+                <div className="mt-5">
+                    <SimilarProducts productId={id} />
+                </div>
+            )}
+
+            <style jsx>{`
+                // ... existing styles ...
+            `}</style>
         </div>
     );
 };

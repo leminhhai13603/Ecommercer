@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getAllUsers, updateUser, deleteUser, blockUser, unblockUser, resetUserPassword } from '../api';
+import { getAllUsers, updateUser, deleteUser, blockUser, unblockUser, resetUserPassword, registerUser } from '../api';
 
 const UserPage = () => {
     const [users, setUsers] = useState([]);
@@ -8,7 +8,8 @@ const UserPage = () => {
         lastname: '',
         email: '',
         mobile: '',
-        role: ''
+        role: '',
+        password: ''
     });
     const [editingUserId, setEditingUserId] = useState(null);
 
@@ -33,12 +34,27 @@ const UserPage = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            await updateUser(editingUserId, formData);
-            setFormData({ firstname: '', lastname: '', email: '', mobile: '', role: '' });
+            if (editingUserId) {
+                // Cập nhật người dùng hiện có
+                const updateData = { ...formData };
+                delete updateData.password; // Không cập nhật mật khẩu khi sửa
+                await updateUser(editingUserId, updateData);
+            } else {
+                // Thêm người dùng mới
+                const registerData = { ...formData };
+                if (!registerData.password) {
+                    registerData.password = '1'; // Mật khẩu mặc định là "1" nếu không nhập
+                }
+                await registerUser(registerData);
+            }
+            
+            // Reset form và fetch lại danh sách
+            setFormData({ firstname: '', lastname: '', email: '', mobile: '', role: '', password: '' });
             setEditingUserId(null);
             fetchUsers();
         } catch (error) {
-            console.error('Lỗi khi cập nhật người dùng:', error);
+            console.error('Lỗi khi thao tác với người dùng:', error);
+            alert(error.response?.data?.message || 'Có lỗi xảy ra');
         }
     };
 
@@ -48,7 +64,8 @@ const UserPage = () => {
             lastname: user.lastname,
             email: user.email,
             mobile: user.mobile,
-            role: user.role
+            role: user.role,
+            password: ''
         });
         setEditingUserId(user._id);
     };
@@ -104,7 +121,29 @@ const UserPage = () => {
                     <option value="user">Người dùng</option>
                     <option value="admin">Quản trị viên</option>
                 </select>
+                {!editingUserId && (
+                    <input 
+                        type="password" 
+                        name="password" 
+                        value={formData.password} 
+                        onChange={handleChange} 
+                        className="form-control mb-2" 
+                        placeholder="Mật khẩu (mặc định: 1)" 
+                    />
+                )}
                 <button type="submit" className="btn btn-success">{editingUserId ? 'Cập nhật' : 'Thêm'} Người dùng</button>
+                {editingUserId && (
+                    <button 
+                        type="button" 
+                        className="btn btn-secondary ms-2"
+                        onClick={() => {
+                            setEditingUserId(null);
+                            setFormData({ firstname: '', lastname: '', email: '', mobile: '', role: '', password: '' });
+                        }}
+                    >
+                        Hủy
+                    </button>
+                )}
             </form>
             <h2>Danh sách Người dùng</h2>
             <ul className="list-group mb-4">
